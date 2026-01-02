@@ -1,0 +1,5 @@
+{
+  "name": "American Iron AI Quoter",
+  "description": "AI-powered logistics and engineering quoting tool for Caterpillar components. Features automated PDF/Excel parsing, weight-based logistics calculations, and generative AI part visualization.",
+  "requestFramePermissions": []
+}
