@@ -12,11 +12,24 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700;900&display=swap" rel="stylesheet">
     <script>
         // Polyfill process.env safely
-        window.process = window.process || { env: { API_KEY: '' } };
+        try {
+            if (!window.process) {
+                window.process = { env: { API_KEY: '' } };
+            } else if (!window.process.env) {
+                // If process exists but env doesn't, try to assign env
+                try { window.process.env = { API_KEY: '' }; } catch(e) { console.warn('Could not polyfill process.env', e); }
+            }
+        } catch (e) {
+            console.warn('Could not polyfill window.process', e);
+        }
         
         window.onload = function() {
-            if (window.pdfjsLib) {
-                window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            try {
+                if (window.pdfjsLib) {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                }
+            } catch (e) {
+                console.warn('Could not set PDF worker source', e);
             }
         };
     </script>
