@@ -12,6 +12,8 @@ interface ConfigPanelProps {
   aiEnabled: boolean;
   isAnalyzing: boolean;
   config: AppConfig;
+  customLogo: string | null;
+  onLogoUpload: (logo: string) => void;
 }
 
 export const ConfigPanel: React.FC<ConfigPanelProps> = ({
@@ -22,7 +24,9 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   onAnalyze,
   aiEnabled,
   isAnalyzing,
-  config
+  config,
+  customLogo,
+  onLogoUpload
 }) => {
   const [activeTab, setActiveTab] = useState<ParseMode>(ParseMode.PASTE);
   const [textInput, setTextInput] = useState("");
@@ -65,20 +69,42 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
     onClientChange(newClient);
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        if (ev.target?.result) {
+          onLogoUpload(ev.target.result as string);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-200 mb-8 no-print">
       {/* Header */}
       <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
         <div className="flex items-center gap-6">
-          {/* Replaced image with Logo component */}
-          <Logo className="h-24 w-auto" />
+          <div className="relative group">
+            {customLogo ? (
+                <img src={customLogo} alt="Company Logo" className="h-24 w-auto object-contain" />
+            ) : (
+                <Logo className="h-24 w-auto object-contain" />
+            )}
+            <label className="absolute -bottom-2 -right-2 bg-slate-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-full cursor-pointer hover:bg-slate-700 shadow-lg border border-white transition-all transform hover:scale-105">
+                ADD LOGO
+                <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} />
+            </label>
+          </div>
           <div className="h-12 w-px bg-slate-200 hidden md:block"></div>
           <div>
             <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 hidden md:block">Quoting Engine</h2>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Logistics & Engineering Intelligence</p>
           </div>
         </div>
-        <div className="text-[10px] text-slate-300 font-black uppercase tracking-[0.3em]">Build v9.2 [React]</div>
+        <div className="text-[10px] text-slate-300 font-black uppercase tracking-[0.3em]">Build v9.3 [Embedded-Logo]</div>
       </div>
 
       {/* AI Controls */}

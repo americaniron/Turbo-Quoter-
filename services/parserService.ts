@@ -79,9 +79,6 @@ export const parseTextData = (text: string): QuoteItem[] => {
       // A. Extract Part Number from the block
       let possibleParts = [];
       let pm;
-      // RESET REGEX LASTINDEX for every new block!
-      partPattern.lastIndex = 0;
-      
       while ((pm = partPattern.exec(block)) !== null) {
           if (!/^\d{1,4}$/.test(pm[0])) { 
               possibleParts.push({val: pm[0], idx: pm.index});
@@ -99,7 +96,7 @@ export const parseTextData = (text: string): QuoteItem[] => {
           partNo = possibleParts[possibleParts.length - 1].val;
       }
 
-      if (partNo && partNo.endsWith("-")) partNo = partNo.slice(0, -1);
+      if (partNo.endsWith("-")) partNo = partNo.slice(0, -1);
 
       // B. Extract Quantity from the block (look for number preceding partNo)
       let qty = 1;
@@ -132,7 +129,7 @@ export const parseTextData = (text: string): QuoteItem[] => {
 
       items.push({
           qty,
-          partNo: partNo || `ITEM-${i+1}`,
+          partNo,
           desc,
           weight,
           unitPrice: hits[i].unitPrice

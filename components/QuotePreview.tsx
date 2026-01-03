@@ -9,25 +9,18 @@ interface QuotePreviewProps {
   config: AppConfig;
   aiEnabled: boolean;
   aiAnalysis: string | null;
-  onAddToFavorites: (item: QuoteItem) => void;
+  customLogo: string | null;
 }
 
-export const QuotePreview: React.FC<QuotePreviewProps> = ({ 
-  items, 
-  client, 
-  config, 
-  aiEnabled, 
-  aiAnalysis,
-  onAddToFavorites 
-}) => {
+export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, config, aiEnabled, aiAnalysis, customLogo }) => {
   if (items.length === 0) return null;
 
   const markupMultiplier = 1 + (config.markupPercentage / 100);
   
-  // Total Weight Calculation
+  // Requirement #2: Total Weight Calculation
   const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.qty), 0);
   
-  // Logistics Cost = Total Weight * $2.50
+  // Requirement #3: Logistics Cost = Total Weight * $2.50
   const logisticsCost = totalWeight * 2.50;
 
   const subtotal = items.reduce((sum, item) => sum + (item.unitPrice * markupMultiplier * item.qty), 0);
@@ -43,6 +36,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({
   
   const today = formatDate(new Date());
   
+  // Safe date parsing ensuring no issues with timezones on basic YYYY-MM-DD
   const getExpirationDate = () => {
       if (!config.expirationDate) return 'UNDEFINED';
       const [y, m, d] = config.expirationDate.split('-').map(Number);
@@ -57,7 +51,11 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({
       <div className="flex justify-between items-start mb-10">
         <div>
           {/* Logo Component */}
-          <Logo className="h-28 print:h-24 w-auto mb-2 block print:block" />
+          {customLogo ? (
+            <img src={customLogo} alt="Company Logo" className="h-32 print:h-28 w-auto object-contain mb-2 block print:block" />
+          ) : (
+            <Logo className="h-32 print:h-28 w-auto object-contain mb-2 block print:block" />
+          )}
           <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] pl-1">
             Engineering Component Logistics
           </p>
@@ -110,7 +108,6 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({
             <th className="text-center border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-20">Weight</th>
             <th className="text-right border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-24">Unit Val</th>
             <th className="text-right border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-24">Total</th>
-            <th className="text-center border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-10 no-print">Add</th>
           </tr>
         </thead>
         <tbody>
@@ -122,10 +119,12 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({
                 <td className="py-4 px-1 align-top text-center text-xs font-bold text-slate-400">{idx + 1}</td>
                 <td className="py-4 px-1 align-top text-center text-sm font-black text-slate-800">{item.qty}</td>
                 <td className="py-4 px-1 align-top">
+                    {/* Requirement #4: Exact Part Photo Generation handled in Component */}
                     <PartImage partNo={item.partNo} description={item.desc} enableAI={aiEnabled} />
                 </td>
                 <td className="py-4 px-1 align-top">
                   <p className="font-black text-xs uppercase text-slate-900 mb-1">{item.partNo}</p>
+                  {/* Requirement #1: Clean description ONLY */}
                   <p className="text-[10px] text-slate-500 font-bold uppercase leading-tight">{item.desc}</p>
                 </td>
                 <td className="py-4 px-1 align-top text-center">
@@ -138,15 +137,6 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({
                 </td>
                 <td className="py-4 px-1 align-top text-right font-black text-xs text-slate-900">
                   ${lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-                <td className="py-4 px-1 align-top text-center no-print">
-                   <button 
-                    onClick={() => onAddToFavorites(item)}
-                    title="Add to Reorder List"
-                    className="w-6 h-6 rounded-full bg-slate-100 hover:bg-[#ffcd00] hover:text-black text-slate-400 flex items-center justify-center transition-colors"
-                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"></path></svg>
-                   </button>
                 </td>
               </tr>
             );
@@ -161,11 +151,13 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({
             <span className="font-black text-slate-800">${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>
         
+        {/* Requirement #2: Total Weight Display */}
         <div className="flex justify-between text-[11px] py-1 border-b border-slate-200 mb-2">
             <span className="text-slate-400 font-bold uppercase">Total Weight</span>
             <span className="font-black text-slate-800">{totalWeight.toFixed(2)} LBS</span>
         </div>
 
+        {/* Requirement #3: Logistics Calculated Display */}
         <div className="flex justify-between text-[11px] py-1 mb-2">
             <span className="text-slate-400 font-bold uppercase">Logistics (Rate $2.50)</span>
             <span className="font-black text-slate-800">${logisticsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>

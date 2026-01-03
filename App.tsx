@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
-import { ReorderList } from './components/ReorderList.tsx';
 import { QuoteItem, ClientInfo, AppConfig } from './types.ts';
 import { analyzeQuoteData } from './services/geminiService.ts';
 
@@ -14,7 +13,6 @@ const App: React.FC = () => {
   };
 
   const [items, setItems] = useState<QuoteItem[]>([]);
-  const [favorites, setFavorites] = useState<QuoteItem[]>([]);
   const [client, setClient] = useState<ClientInfo>({ company: '', email: '', phone: '' });
   const [config, setConfig] = useState<AppConfig>({ 
     markupPercentage: 25, 
@@ -24,6 +22,7 @@ const App: React.FC = () => {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
   
   // Reference for scrolling to results
   const resultRef = useRef<HTMLDivElement>(null);
@@ -46,19 +45,6 @@ const App: React.FC = () => {
     setIsAnalyzing(false);
   };
 
-  const addToFavorites = (item: QuoteItem) => {
-    // Avoid duplicates based on Part No
-    if (!favorites.some(fav => fav.partNo === item.partNo)) {
-      setFavorites([...favorites, item]);
-    }
-  };
-
-  const removeFromFavorites = (index: number) => {
-    const newFavs = [...favorites];
-    newFavs.splice(index, 1);
-    setFavorites(newFavs);
-  };
-
   return (
     <div className="min-h-screen pb-20">
       <ConfigPanel 
@@ -70,15 +56,10 @@ const App: React.FC = () => {
         aiEnabled={aiEnabled}
         isAnalyzing={isAnalyzing}
         config={config}
+        customLogo={customLogo}
+        onLogoUpload={setCustomLogo}
       />
       
-      {/* Display Favorites/Reorder List if items exist */}
-      <ReorderList 
-        items={favorites} 
-        onRemove={removeFromFavorites}
-        onClear={() => setFavorites([])}
-      />
-
       <div ref={resultRef}>
         <QuotePreview 
             items={items} 
@@ -86,7 +67,7 @@ const App: React.FC = () => {
             config={config} 
             aiEnabled={aiEnabled}
             aiAnalysis={aiAnalysis}
-            onAddToFavorites={addToFavorites}
+            customLogo={customLogo}
         />
       </div>
     </div>
