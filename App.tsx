@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
+import { ReorderList } from './components/ReorderList.tsx';
 import { QuoteItem, ClientInfo, AppConfig } from './types.ts';
 import { analyzeQuoteData } from './services/geminiService.ts';
 
@@ -13,6 +14,7 @@ const App: React.FC = () => {
   };
 
   const [items, setItems] = useState<QuoteItem[]>([]);
+  const [favorites, setFavorites] = useState<QuoteItem[]>([]);
   const [client, setClient] = useState<ClientInfo>({ company: '', email: '', phone: '' });
   const [config, setConfig] = useState<AppConfig>({ 
     markupPercentage: 25, 
@@ -44,6 +46,19 @@ const App: React.FC = () => {
     setIsAnalyzing(false);
   };
 
+  const addToFavorites = (item: QuoteItem) => {
+    // Avoid duplicates based on Part No
+    if (!favorites.some(fav => fav.partNo === item.partNo)) {
+      setFavorites([...favorites, item]);
+    }
+  };
+
+  const removeFromFavorites = (index: number) => {
+    const newFavs = [...favorites];
+    newFavs.splice(index, 1);
+    setFavorites(newFavs);
+  };
+
   return (
     <div className="min-h-screen pb-20">
       <ConfigPanel 
@@ -57,6 +72,13 @@ const App: React.FC = () => {
         config={config}
       />
       
+      {/* Display Favorites/Reorder List if items exist */}
+      <ReorderList 
+        items={favorites} 
+        onRemove={removeFromFavorites}
+        onClear={() => setFavorites([])}
+      />
+
       <div ref={resultRef}>
         <QuotePreview 
             items={items} 
@@ -64,6 +86,7 @@ const App: React.FC = () => {
             config={config} 
             aiEnabled={aiEnabled}
             aiAnalysis={aiAnalysis}
+            onAddToFavorites={addToFavorites}
         />
       </div>
     </div>

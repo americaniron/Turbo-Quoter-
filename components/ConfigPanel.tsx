@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AppConfig, ClientInfo, ParseMode, QuoteItem } from '../types.ts';
 import { parseTextData, parsePdfFile, parseExcelFile } from '../services/parserService.ts';
+import { Logo } from './Logo.tsx';
 
 interface ConfigPanelProps {
   onDataLoaded: (items: QuoteItem[]) => void;
@@ -69,7 +70,8 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-8 border-b border-slate-100 pb-4">
         <div className="flex items-center gap-6">
-          <img src="logo.png" alt="American Iron" className="h-24 w-auto object-contain" />
+          {/* Replaced image with Logo component */}
+          <Logo className="h-24 w-auto" />
           <div className="h-12 w-px bg-slate-200 hidden md:block"></div>
           <div>
             <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 hidden md:block">Quoting Engine</h2>
