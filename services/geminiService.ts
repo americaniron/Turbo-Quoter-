@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { QuoteItem } from "../types.ts";
 
 // Singleton instance holder
@@ -110,5 +110,65 @@ export const analyzeQuoteData = async (items: QuoteItem[]): Promise<string> => {
   } catch (error) {
     console.error("Analysis Error:", error);
     return "AI Analysis service temporarily unavailable.";
+  }
+};
+
+/**
+ * Parses unstructured text into structured QuoteItems using Gemini 2.5 Flash.
+ * Used as a fallback for PDF parsing.
+ */
+export const parseDocumentWithAI = async (text: string): Promise<QuoteItem[]> => {
+  const ai = getAiClient();
+  if (!ai) {
+    console.warn("AI Client unavailable for parsing");
+    return [];
+  }
+
+  try {
+    const prompt = `
+    Extract line items from the following document text.
+    Return a JSON array of objects with these properties:
+    - qty (number, default 1)
+    - partNo (string, try to find the Part Number or SKU)
+    - desc (string, description of the item)
+    - weight (number, in LBS. If unit is KG, convert to LBS. If missing, use 0)
+    - unitPrice (number, remove currency symbols)
+    
+    Ignore pages headers, footers, and summary totals. Focus on the line items.
+    
+    Document Text:
+    ${text.substring(0, 30000)} 
+    `; 
+    // Truncate to avoid token limits if PDF is huge, though Flash context is large.
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+             type: Type.OBJECT,
+             properties: {
+                qty: { type: Type.NUMBER },
+                partNo: { type: Type.STRING },
+                desc: { type: Type.STRING },
+                weight: { type: Type.NUMBER },
+                unitPrice: { type: Type.NUMBER }
+             }
+          }
+        }
+      }
+    });
+
+    const rawJSON = response.text;
+    if (!rawJSON) return [];
+    
+    const parsed = JSON.parse(rawJSON);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error("AI Parsing Error:", error);
+    return [];
   }
 };

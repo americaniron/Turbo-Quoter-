@@ -1,4 +1,5 @@
 import { QuoteItem } from '../types.ts';
+import { parseDocumentWithAI } from './geminiService.ts';
 
 // --- Helper Functions ---
 
@@ -191,17 +192,55 @@ export const parseExcelFile = async (file: File): Promise<QuoteItem[]> => {
 export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let fullText = "";
+  let fullStructureText = "";
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
     
-    // Simple text concatenation often works better for regex block parsing 
-    // than complex spatial reconstruction for this specific document type.
-    const pageText = content.items.map((item: any) => item.str).join(" ");
-    fullText += pageText + "\n";
+    // Improved extraction: Sort by Y (top to bottom) then X (left to right)
+    // transform[5] is Y (0 at bottom, so higher is top), transform[4] is X
+    const items = content.items.map((item: any) => ({
+      str: item.str,
+      x: item.transform[4],
+      y: item.transform[5],
+      hasEOL: item.hasEOL
+    }));
+
+    // Sort by Y descending (top to bottom), then X ascending
+    items.sort((a: any, b: any) => {
+      const yDiff = b.y - a.y;
+      if (Math.abs(yDiff) > 5) return yDiff; // Different lines
+      return a.x - b.x; // Same line (within tolerance)
+    });
+
+    // Reconstruct lines
+    let lastY = -1;
+    let pageText = "";
+    for (const item of items) {
+      if (lastY !== -1 && Math.abs(item.y - lastY) > 5) {
+        pageText += "\n";
+      } else if (lastY !== -1) {
+        // Same line, add spacing based on X distance? 
+        // For simplicity, just add a space.
+        pageText += " ";
+      }
+      pageText += item.str;
+      lastY = item.y;
+    }
+    
+    fullStructureText += pageText + "\n";
   }
   
-  return parseTextData(fullText);
+  // Attempt 1: Standard Regex Parsing
+  const regexItems = parseTextData(fullStructureText);
+  
+  if (regexItems.length > 0) {
+    return regexItems;
+  }
+
+  // Attempt 2: AI Fallback (Gemini 2.5 Flash)
+  // If regex failed (0 items), it means the PDF format is likely complex or non-standard.
+  console.log("Regex parsing yielded 0 items. Attempting AI parse...");
+  return await parseDocumentWithAI(fullStructureText);
 };
