@@ -246,7 +246,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           <textarea
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
-            className="w-full h-40 p-5 border border-slate-200 rounded-2xl shadow-inner text-sm font-mono focus:ring-2 focus:ring-yellow-400 outline-none resize-none"
+            className="w-full h-40 p-5 border border-slate-200 rounded-2xl shadow-inner text-sm font-mono text-black focus:ring-2 focus:ring-yellow-400 outline-none resize-none"
             placeholder="Paste item rows here (Format: Part# Description $Price)..."
           />
         )}
@@ -272,7 +272,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           <select 
             value={config.markupPercentage} 
             onChange={(e) => updateConfig('markupPercentage', parseInt(e.target.value))}
-            className="w-full p-2 bg-white border border-slate-200 rounded-xl font-black text-xs outline-none"
+            className="w-full p-2 bg-white border border-slate-200 rounded-xl font-black text-xs text-black outline-none"
           >
             <option value="15">15% Margin</option>
             <option value="20">20% Margin</option>
@@ -313,7 +313,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                     const val = e.target.value;
                     updateConfig('logisticsRate', val === '' ? 0 : parseFloat(val));
                 }}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-black text-xs outline-none focus:border-yellow-400"
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-black text-xs text-black outline-none focus:border-yellow-400"
              />
         </div>
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -322,7 +322,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
             type="text" 
             value={config.quoteId}
             onChange={(e) => updateConfig('quoteId', e.target.value)}
-            className="w-full p-2.5 border border-slate-200 rounded-xl font-black text-xs uppercase outline-none focus:border-yellow-400"
+            className="w-full p-2.5 border border-slate-200 rounded-xl font-black text-xs text-black uppercase outline-none focus:border-yellow-400"
           />
         </div>
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
@@ -331,7 +331,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
             type="date" 
             value={config.expirationDate}
             onChange={(e) => updateConfig('expirationDate', e.target.value)}
-            className="w-full p-2.5 border border-slate-200 rounded-xl font-black text-xs uppercase outline-none focus:border-yellow-400"
+            className="w-full p-2.5 border border-slate-200 rounded-xl font-black text-xs text-black uppercase outline-none focus:border-yellow-400"
           />
         </div>
       </div>
@@ -340,9 +340,9 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-8">
         <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Client Destination</div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input type="text" placeholder="Company Name" value={client.company} onChange={(e) => updateClient('company', e.target.value)} className="p-3 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-yellow-400" />
-          <input type="text" placeholder="Email Address" value={client.email} onChange={(e) => updateClient('email', e.target.value)} className="p-3 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-yellow-400" />
-          <input type="text" placeholder="Phone Number" value={client.phone} onChange={(e) => updateClient('phone', e.target.value)} className="p-3 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-yellow-400" />
+          <input type="text" placeholder="Company Name" value={client.company} onChange={(e) => updateClient('company', e.target.value)} className="p-3 border border-slate-200 rounded-xl text-xs text-black font-bold outline-none focus:border-yellow-400" />
+          <input type="text" placeholder="Email Address" value={client.email} onChange={(e) => updateClient('email', e.target.value)} className="p-3 border border-slate-200 rounded-xl text-xs text-black font-bold outline-none focus:border-yellow-400" />
+          <input type="text" placeholder="Phone Number" value={client.phone} onChange={(e) => updateClient('phone', e.target.value)} className="p-3 border border-slate-200 rounded-xl text-xs text-black font-bold outline-none focus:border-yellow-400" />
         </div>
       </div>
 
