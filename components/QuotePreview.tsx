@@ -17,11 +17,16 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
 
   const markupMultiplier = 1 + (config.markupPercentage / 100);
   
-  // Requirement #2: Total Weight Calculation
-  const totalWeight = items.reduce((sum, item) => sum + (item.weight * item.qty), 0);
+  // Weights are stored in LBS. Convert for display/calculation if KG is selected.
+  // 1 LB = 0.453592 KG
+  const conversionFactor = config.weightUnit === 'KG' ? 0.453592 : 1;
+  const unitLabel = config.weightUnit;
+
+  // Calculate Total Weight in the SELECTED unit
+  const totalWeight = items.reduce((sum, item) => sum + (item.weight * conversionFactor * item.qty), 0);
   
-  // Requirement #3: Logistics Cost = Total Weight * $2.50
-  const logisticsCost = totalWeight * 2.50;
+  // Logistics Cost = Total Weight (in selected unit) * Rate (per selected unit)
+  const logisticsCost = totalWeight * (config.logisticsRate || 0);
 
   const subtotal = items.reduce((sum, item) => sum + (item.unitPrice * markupMultiplier * item.qty), 0);
   const total = subtotal + logisticsCost;
@@ -57,21 +62,25 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
             <Logo className="h-32 print:h-28 w-auto object-contain mb-2 block print:block" />
           )}
           <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] pl-1">
-            Engineering Component Logistics
+            {config.isInvoice ? 'Commercial Invoice & Logistics' : 'Engineering Component Logistics'}
           </p>
         </div>
         <div className="text-right pt-4">
-          <p className="text-sm font-black text-slate-800">REF: {config.quoteId}</p>
-          <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{today}</p>
-          <p className="text-[10px] text-red-500 font-bold uppercase mt-1">Valid Until: {expirationText}</p>
+          <p className="text-sm font-black text-slate-800">
+             {config.isInvoice ? 'INVOICE #:' : 'REF:'} {config.quoteId}
+          </p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">DATE: {today}</p>
+          <p className={`text-[10px] font-bold uppercase mt-1 ${config.isInvoice ? 'text-slate-900' : 'text-red-500'}`}>
+            {config.isInvoice ? 'DUE DATE:' : 'VALID UNTIL:'} {expirationText}
+          </p>
         </div>
       </div>
 
       {/* Client & AI Info Grid */}
       <div className="grid grid-cols-2 gap-12 mt-10 mb-8">
         <div>
-          <div className="border-b-4 border-[#ffcd00] bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3">
-            Client Recipient
+          <div className={`border-b-4 ${config.isInvoice ? 'border-red-600' : 'border-[#ffcd00]'} bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3`}>
+            {config.isInvoice ? 'Bill To' : 'Client Recipient'}
           </div>
           <div className="text-xs space-y-1 pl-1">
             <p className="font-black text-slate-900 uppercase">{client.company || 'Valued Customer'}</p>
@@ -80,7 +89,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
           </div>
         </div>
         
-        {aiAnalysis && (
+        {aiAnalysis && !config.isInvoice && (
            <div>
             <div className="border-b-4 border-indigo-500 bg-indigo-50 px-3 py-2 font-bold uppercase text-[10px] text-indigo-900 mb-3 flex justify-between">
                 <span>AI Analysis & Suggestions</span>
@@ -94,8 +103,8 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
       </div>
 
       {/* Items Table */}
-      <div className="border-b-4 border-[#ffcd00] bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3">
-        Component Assessment
+      <div className={`border-b-4 ${config.isInvoice ? 'border-red-600' : 'border-[#ffcd00]'} bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3`}>
+        {config.isInvoice ? 'Invoice Detail' : 'Component Assessment'}
       </div>
       
       <table className="w-full border-collapse mb-8">
@@ -114,23 +123,24 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
           {items.map((item, idx) => {
             const unitPrice = item.unitPrice * markupMultiplier;
             const lineTotal = unitPrice * item.qty;
+            const displayWeight = item.weight * conversionFactor;
+            
             return (
               <tr key={idx} className="border-b border-slate-100 group">
                 <td className="py-4 px-1 align-top text-center text-xs font-bold text-slate-400">{idx + 1}</td>
                 <td className="py-4 px-1 align-top text-center text-sm font-black text-slate-800">{item.qty}</td>
                 <td className="py-4 px-1 align-top">
-                    {/* Requirement #4: Exact Part Photo Generation handled in Component */}
+                    {/* Exact Part Photo Generation handled in Component */}
                     <PartImage partNo={item.partNo} description={item.desc} enableAI={aiEnabled} />
                 </td>
                 <td className="py-4 px-1 align-top">
                   <p className="font-black text-xs uppercase text-slate-900 mb-1">{item.partNo}</p>
-                  {/* Requirement #1: Clean description ONLY */}
                   <p className="text-[10px] text-slate-500 font-bold uppercase leading-tight">{item.desc}</p>
                 </td>
                 <td className="py-4 px-1 align-top text-center">
-                    <span className="font-bold text-[10px] text-slate-700">{item.weight.toFixed(2)}</span>
+                    <span className="font-bold text-[10px] text-slate-700">{displayWeight.toFixed(2)}</span>
                     <br/>
-                    <span className="text-[8px] text-slate-300 font-black">LBS</span>
+                    <span className="text-[8px] text-slate-300 font-black">{unitLabel}</span>
                 </td>
                 <td className="py-4 px-1 align-top text-right font-bold text-xs text-slate-600">
                   ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -151,20 +161,20 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
             <span className="font-black text-slate-800">${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>
         
-        {/* Requirement #2: Total Weight Display */}
+        {/* Total Weight Display */}
         <div className="flex justify-between text-[11px] py-1 border-b border-slate-200 mb-2">
             <span className="text-slate-400 font-bold uppercase">Total Weight</span>
-            <span className="font-black text-slate-800">{totalWeight.toFixed(2)} LBS</span>
+            <span className="font-black text-slate-800">{totalWeight.toFixed(2)} {unitLabel}</span>
         </div>
 
-        {/* Requirement #3: Logistics Calculated Display */}
+        {/* Logistics Calculated Display */}
         <div className="flex justify-between text-[11px] py-1 mb-2">
-            <span className="text-slate-400 font-bold uppercase">Logistics (Rate $2.50)</span>
+            <span className="text-slate-400 font-bold uppercase">Logistics (Rate ${config.logisticsRate?.toFixed(2)})</span>
             <span className="font-black text-slate-800">${logisticsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>
         
-        <div className="bg-black text-[#ffcd00] p-4 rounded-lg flex justify-between items-center mt-4">
-            <span className="uppercase text-xs font-black tracking-tight">Total Quote</span>
+        <div className={`${config.isInvoice ? 'bg-red-600 text-white' : 'bg-black text-[#ffcd00]'} p-4 rounded-lg flex justify-between items-center mt-4`}>
+            <span className="uppercase text-xs font-black tracking-tight">{config.isInvoice ? 'Total Due' : 'Total Quote'}</span>
             <span className="text-xl font-black">${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>
       </div>

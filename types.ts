@@ -16,6 +16,9 @@ export interface AppConfig {
   markupPercentage: number;
   quoteId: string;
   expirationDate: string; // YYYY-MM-DD format
+  logisticsRate: number;
+  isInvoice: boolean;
+  weightUnit: 'LBS' | 'KG';
 }
 
 export enum ParseMode {

@@ -29,13 +29,19 @@ function cleanDescription(text: string): string {
  * Extract weight and normalize to LBS.
  */
 function extractWeight(text: string): number {
-  const m = String(text).match(/(\d{1,4}(?:\.\d+)?)\s*(lb|lbs|kg|kg\.)\b/i);
+  // Enhanced regex to catch more unit variations (lbs, kg, kgs, kilogram, etc.)
+  const m = String(text).match(/(\d{1,4}(?:\.\d+)?)\s*(lb|lbs|kg|kgs|kilogram|kilograms|k\.g\.)\b/i);
   if (!m) return 0;
   
   const val = parseFloat(m[1]);
   const unit = (m[2] || "").toLowerCase();
   
-  return unit.includes("kg") ? val * 2.2046 : val;
+  // Normalize everything to LBS for internal storage
+  if (unit.includes("kg") || unit.includes("kilogram")) {
+      return val * 2.20462;
+  }
+  
+  return val;
 }
 
 // --- Main Parsers ---

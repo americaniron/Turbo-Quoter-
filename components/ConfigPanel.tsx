@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppConfig, ClientInfo, ParseMode, QuoteItem } from '../types.ts';
 import { parseTextData, parsePdfFile, parseExcelFile } from '../services/parserService.ts';
 import { Logo } from './Logo.tsx';
@@ -9,6 +9,11 @@ interface ConfigPanelProps {
   onClientChange: (info: ClientInfo) => void;
   onAiToggle: (enabled: boolean) => void;
   onAnalyze: () => void;
+  onSaveQuote: () => void;
+  onLoadQuote: (file: File) => void;
+  onSaveDraft: () => void;
+  onResumeDraft: () => void;
+  hasDraft: boolean;
   aiEnabled: boolean;
   isAnalyzing: boolean;
   config: AppConfig;
@@ -22,6 +27,11 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   onClientChange,
   onAiToggle,
   onAnalyze,
+  onSaveQuote,
+  onLoadQuote,
+  onSaveDraft,
+  onResumeDraft,
+  hasDraft,
   aiEnabled,
   isAnalyzing,
   config,
@@ -32,6 +42,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   const [textInput, setTextInput] = useState("");
   const [client, setClient] = useState<ClientInfo>({ company: '', email: '', phone: '' });
   const [status, setStatus] = useState("Ready");
+  const [draftSavedMsg, setDraftSavedMsg] = useState(false);
 
   const handleProcess = async () => {
     setStatus("Processing...");
@@ -81,6 +92,29 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       reader.readAsDataURL(file);
     }
   };
+  
+  const handleLoadClick = () => {
+      document.getElementById('loadQuoteInput')?.click();
+  };
+
+  const handleLoadFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files?.[0]) {
+          onLoadQuote(e.target.files[0]);
+          e.target.value = ''; // Reset so same file can be loaded again if needed
+      }
+  };
+  
+  const handleEmail = () => {
+      const subject = `${config.isInvoice ? 'INVOICE' : 'QUOTE'} - ${config.quoteId}`;
+      const body = `Please find the attached ${config.isInvoice ? 'invoice' : 'quote'} for your review.\n\nRef: ${config.quoteId}\nTotal Due: [See Attachment]\n\nThank you,\nAmerican Iron`;
+      window.location.href = `mailto:${client.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
+  
+  const handleDraftSaveClick = () => {
+      onSaveDraft();
+      setDraftSavedMsg(true);
+      setTimeout(() => setDraftSavedMsg(false), 2000);
+  };
 
   return (
     <div className="max-w-5xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-200 mb-8 no-print">
@@ -104,7 +138,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Logistics & Engineering Intelligence</p>
           </div>
         </div>
-        <div className="text-[10px] text-slate-300 font-black uppercase tracking-[0.3em]">Build v9.3 [Embedded-Logo]</div>
+        <div className="text-[10px] text-slate-300 font-black uppercase tracking-[0.3em]">Build v9.7 [LBS/KG]</div>
       </div>
 
       {/* AI Controls */}
@@ -120,6 +154,73 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
             <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={aiEnabled} onChange={(e) => onAiToggle(e.target.checked)} className="w-4 h-4 accent-yellow-400 rounded" />
                 <span className="text-[10px] text-slate-300 font-bold uppercase">Gen Photos</span>
+            </label>
+         </div>
+      </div>
+
+      {/* Persistence & Mode Controls */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+         {/* File Operations */}
+         <div className="bg-indigo-50 p-3 rounded-2xl border border-indigo-100 flex items-center gap-2">
+             <span className="text-[9px] font-black uppercase text-indigo-300 px-2 tracking-widest hidden lg:block">File</span>
+             <button 
+                onClick={onSaveQuote}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase px-3 py-2 rounded-lg transition-colors flex items-center gap-1"
+                title="Download JSON File"
+             >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                Save File
+             </button>
+             <button 
+                onClick={handleLoadClick}
+                className="bg-white hover:bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase px-3 py-2 rounded-lg border border-indigo-200 transition-colors flex items-center gap-1"
+                title="Upload JSON File"
+             >
+                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                Load File
+             </button>
+             <input type="file" id="loadQuoteInput" className="hidden" accept=".json" onChange={handleLoadFileChange} />
+         </div>
+
+         {/* Draft Operations */}
+         <div className="bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center gap-2 flex-1">
+             <span className="text-[9px] font-black uppercase text-slate-400 px-2 tracking-widest hidden lg:block">Draft</span>
+             <button 
+                onClick={handleDraftSaveClick}
+                className={`text-[10px] font-black uppercase px-3 py-2 rounded-lg transition-all flex items-center gap-1 ${draftSavedMsg ? 'bg-green-500 text-white' : 'bg-slate-700 text-white hover:bg-slate-800'}`}
+             >
+                {draftSavedMsg ? (
+                    <>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>
+                        Saved
+                    </>
+                ) : (
+                    <>
+                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                         Save Draft
+                    </>
+                )}
+             </button>
+             {hasDraft && (
+                 <button 
+                    onClick={onResumeDraft}
+                    className="bg-white hover:bg-slate-200 text-slate-700 text-[10px] font-black uppercase px-3 py-2 rounded-lg border border-slate-300 transition-colors flex items-center gap-1"
+                 >
+                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Resume Draft
+                 </button>
+             )}
+         </div>
+
+         {/* Invoice Toggle */}
+         <div className="bg-white p-3 rounded-2xl border border-slate-200 flex items-center justify-center min-w-[150px]">
+             <label className="flex items-center gap-3 cursor-pointer">
+                <span className={`text-[10px] font-black uppercase ${!config.isInvoice ? 'text-indigo-900' : 'text-indigo-300'}`}>Quote</span>
+                <div className="relative">
+                    <input type="checkbox" checked={config.isInvoice} onChange={(e) => updateConfig('isInvoice', e.target.checked)} className="sr-only peer" />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
+                </div>
+                <span className={`text-[10px] font-black uppercase ${config.isInvoice ? 'text-red-600' : 'text-indigo-300'}`}>Invoice</span>
             </label>
          </div>
       </div>
@@ -165,7 +266,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       </div>
 
       {/* Configuration */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
           <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Markup Strategy</label>
           <select 
@@ -179,14 +280,44 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
             <option value="30">30% Margin</option>
           </select>
         </div>
+        
+        {/* Weight Unit Toggle */}
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
+            <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Weight Unit</label>
+            <div className="flex bg-white rounded-xl border border-slate-200 overflow-hidden">
+                <button 
+                    onClick={() => updateConfig('weightUnit', 'LBS')}
+                    className={`flex-1 py-2 text-[10px] font-black uppercase transition-colors ${config.weightUnit === 'LBS' ? 'bg-[#ffcd00] text-black' : 'text-slate-400 hover:bg-slate-50'}`}
+                >
+                    LBS
+                </button>
+                <div className="w-px bg-slate-200"></div>
+                <button 
+                    onClick={() => updateConfig('weightUnit', 'KG')}
+                    className={`flex-1 py-2 text-[10px] font-black uppercase transition-colors ${config.weightUnit === 'KG' ? 'bg-[#ffcd00] text-black' : 'text-slate-400 hover:bg-slate-50'}`}
+                >
+                    KG
+                </button>
+            </div>
+        </div>
+
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-             <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Logistics Rate</label>
-             <div className="w-full p-2.5 bg-slate-100 text-slate-500 border border-slate-200 rounded-xl font-black text-xs">
-                $2.50 / LB (Fixed)
-             </div>
+             <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Logistics ($/{config.weightUnit})</label>
+             <input 
+                type="number" 
+                step="0.01"
+                min="0"
+                placeholder="2.50"
+                value={config.logisticsRate}
+                onChange={(e) => {
+                    const val = e.target.value;
+                    updateConfig('logisticsRate', val === '' ? 0 : parseFloat(val));
+                }}
+                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-black text-xs outline-none focus:border-yellow-400"
+             />
         </div>
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Reference ID</label>
+          <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">{config.isInvoice ? 'Invoice Number' : 'Reference ID'}</label>
           <input 
             type="text" 
             value={config.quoteId}
@@ -195,7 +326,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           />
         </div>
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Valid Until</label>
+          <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">{config.isInvoice ? 'Due Date' : 'Valid Until'}</label>
           <input 
             type="date" 
             value={config.expirationDate}
@@ -236,6 +367,10 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                     <span>AI Brainstorm</span>
                 </>
             )}
+        </button>
+        <button onClick={handleEmail} className="bg-slate-700 hover:bg-slate-800 text-white px-6 py-4 rounded-xl font-black uppercase text-xs transition-colors flex items-center justify-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            Email
         </button>
         <button onClick={() => window.print()} className="bg-black text-white px-8 py-4 rounded-xl font-black uppercase text-xs hover:bg-slate-800 transition-colors">
             Print / PDF
