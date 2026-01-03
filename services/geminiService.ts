@@ -126,20 +126,27 @@ export const parseDocumentWithAI = async (text: string): Promise<QuoteItem[]> =>
 
   try {
     const prompt = `
-    Extract line items from the following document text.
-    Return a JSON array of objects with these properties:
-    - qty (number, default 1)
-    - partNo (string, try to find the Part Number or SKU)
-    - desc (string, description of the item)
-    - weight (number, in LBS. If unit is KG, convert to LBS. If missing, use 0)
-    - unitPrice (number, remove currency symbols)
+    You are an expert Data Parsing Assistant. Your job is to extract tabular line item data from the provided document text (OCR output).
     
-    Ignore pages headers, footers, and summary totals. Focus on the line items.
+    The text may contain an Invoice, Quote, or Packing List.
+    Identify the main table of items. 
     
-    Document Text:
-    ${text.substring(0, 30000)} 
+    Data Cleanliness Rules:
+    - **Description**: Must NOT contain weight (e.g. 0.1 lbs), availability (e.g. 8 in stock), dates (e.g. Jan 02), or status (e.g. Non-returnable).
+    - **Unit Price**: Identify the single unit price (often marked with 'ea'). Do not confuse it with the Total line price.
+    
+    Return a STRICT JSON array of objects. Each object must have:
+    - qty: number (default 1)
+    - partNo: string (Look for Part Number, SKU like 123-4567)
+    - desc: string (Clean description only)
+    - weight: number (in LBS. If missing, use 0)
+    - unitPrice: number (Price per item, no currency symbols)
+
+    Document Text to Parse:
+    """
+    ${text.substring(0, 30000)}
+    """
     `; 
-    // Truncate to avoid token limits if PDF is huge, though Flash context is large.
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',

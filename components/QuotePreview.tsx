@@ -135,7 +135,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
                 </td>
                 <td className="py-4 px-1 align-top">
                   <p className="font-black text-xs uppercase text-slate-900 mb-1">{item.partNo}</p>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase leading-tight">{item.desc}</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase leading-tight whitespace-pre-wrap break-words">{item.desc}</p>
                 </td>
                 <td className="py-4 px-1 align-top text-center">
                     <span className="font-bold text-[10px] text-slate-700">{displayWeight.toFixed(2)}</span>
