@@ -51,17 +51,17 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
   const expirationText = getExpirationDate();
 
   return (
-    <div className="w-[800px] mx-auto bg-white p-12 shadow-2xl mb-12 relative print:shadow-none print:w-full print:p-0">
+    <div className="w-[800px] mx-auto bg-white p-12 shadow-2xl mb-12 relative print:shadow-none print:w-full print:max-w-none print:p-[20mm] print:mb-0 print:mx-0">
       {/* Quote Header */}
-      <div className="flex justify-between items-start mb-10">
+      <div className="flex justify-between items-start mb-10 print:mb-8">
         <div>
           {/* Logo Component */}
           {customLogo ? (
-            <img src={customLogo} alt="Company Logo" className="h-32 print:h-28 w-auto object-contain mb-2 block print:block" />
+            <img src={customLogo} alt="Company Logo" className="h-32 print:h-20 w-auto object-contain mb-2 block print:block" />
           ) : (
-            <Logo className="h-32 print:h-28 w-auto object-contain mb-2 block print:block" />
+            <Logo className="h-32 print:h-20 w-auto object-contain mb-2 block print:block" />
           )}
-          <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] pl-1">
+          <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] pl-1 print:text-slate-600">
             {config.isInvoice ? 'Commercial Invoice & Logistics' : 'Engineering Component Logistics'}
           </p>
         </div>
@@ -69,7 +69,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
           <p className="text-sm font-black text-slate-800">
              {config.isInvoice ? 'INVOICE #:' : 'REF:'} {config.quoteId}
           </p>
-          <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">DATE: {today}</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 print:text-slate-600">DATE: {today}</p>
           <p className={`text-[10px] font-bold uppercase mt-1 ${config.isInvoice ? 'text-slate-900' : 'text-red-500'}`}>
             {config.isInvoice ? 'DUE DATE:' : 'VALID UNTIL:'} {expirationText}
           </p>
@@ -77,20 +77,20 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
       </div>
 
       {/* Client & AI Info Grid */}
-      <div className="grid grid-cols-2 gap-12 mt-10 mb-8">
-        <div>
-          <div className={`border-b-4 ${config.isInvoice ? 'border-red-600' : 'border-[#ffcd00]'} bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3`}>
+      <div className="grid grid-cols-2 gap-12 mt-10 mb-8 print:mt-4 print:mb-6 print:gap-8">
+        <div className="break-inside-avoid">
+          <div className={`border-b-4 ${config.isInvoice ? 'border-red-600' : 'border-[#ffcd00]'} bg-slate-50 print:bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3 print:border-b-2`}>
             {config.isInvoice ? 'Bill To' : 'Client Recipient'}
           </div>
           <div className="text-xs space-y-1 pl-1">
             <p className="font-black text-slate-900 uppercase">{client.company || 'Valued Customer'}</p>
-            <p className="text-slate-500 font-bold">{client.email}</p>
-            <p className="text-slate-500 font-bold">{client.phone}</p>
+            <p className="text-slate-500 font-bold print:text-slate-700">{client.email}</p>
+            <p className="text-slate-500 font-bold print:text-slate-700">{client.phone}</p>
           </div>
         </div>
         
         {aiAnalysis && !config.isInvoice && (
-           <div>
+           <div className="print:hidden">
             <div className="border-b-4 border-indigo-500 bg-indigo-50 px-3 py-2 font-bold uppercase text-[10px] text-indigo-900 mb-3 flex justify-between">
                 <span>AI Analysis & Suggestions</span>
                 <span className="text-[8px] bg-indigo-200 text-indigo-800 px-1 rounded">GEMINI 3</span>
@@ -103,13 +103,13 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
       </div>
 
       {/* Items Table */}
-      <div className={`border-b-4 ${config.isInvoice ? 'border-red-600' : 'border-[#ffcd00]'} bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3`}>
+      <div className={`border-b-4 ${config.isInvoice ? 'border-red-600' : 'border-[#ffcd00]'} bg-slate-50 print:bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3 print:border-b-2`}>
         {config.isInvoice ? 'Invoice Detail' : 'Component Assessment'}
       </div>
       
-      <table className="w-full border-collapse mb-8">
+      <table className="w-full border-collapse mb-8 print:mb-6">
         <thead>
-          <tr>
+          <tr className="break-inside-avoid">
             <th className="text-center border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-10">Line</th>
             <th className="text-center border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-12">Qty</th>
             <th className="text-left border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-28">Reference</th>
@@ -126,23 +126,25 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
             const displayWeight = item.weight * conversionFactor;
             
             return (
-              <tr key={idx} className="border-b border-slate-100 group">
-                <td className="py-4 px-1 align-top text-center text-xs font-bold text-slate-400">{idx + 1}</td>
+              <tr key={idx} className="border-b border-slate-100 group break-inside-avoid print:border-slate-300">
+                <td className="py-4 px-1 align-top text-center text-xs font-bold text-slate-400 print:text-slate-600">{idx + 1}</td>
                 <td className="py-4 px-1 align-top text-center text-sm font-black text-slate-800">{item.qty}</td>
                 <td className="py-4 px-1 align-top">
                     {/* Exact Part Photo Generation handled in Component */}
-                    <PartImage partNo={item.partNo} description={item.desc} enableAI={aiEnabled} />
+                    <div className="print:grayscale">
+                        <PartImage partNo={item.partNo} description={item.desc} enableAI={aiEnabled} />
+                    </div>
                 </td>
                 <td className="py-4 px-1 align-top">
                   <p className="font-black text-xs uppercase text-slate-900 mb-1">{item.partNo}</p>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase leading-tight whitespace-pre-wrap break-words">{item.desc}</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase leading-tight whitespace-pre-wrap break-words print:text-slate-800">{item.desc}</p>
                 </td>
                 <td className="py-4 px-1 align-top text-center">
                     <span className="font-bold text-[10px] text-slate-700">{displayWeight.toFixed(2)}</span>
                     <br/>
-                    <span className="text-[8px] text-slate-300 font-black">{unitLabel}</span>
+                    <span className="text-[8px] text-slate-300 font-black print:text-slate-500">{unitLabel}</span>
                 </td>
-                <td className="py-4 px-1 align-top text-right font-bold text-xs text-slate-600">
+                <td className="py-4 px-1 align-top text-right font-bold text-xs text-slate-600 print:text-slate-800">
                   ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
                 <td className="py-4 px-1 align-top text-right font-black text-xs text-slate-900">
@@ -155,38 +157,38 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
       </table>
 
       {/* Totals Section */}
-      <div className="ml-auto w-72 bg-slate-50 p-6 border border-slate-200 rounded-xl break-inside-avoid">
-        <div className="flex justify-between text-[11px] py-1 border-b border-slate-200 mb-2">
-            <span className="text-slate-400 font-bold uppercase">Subtotal</span>
+      <div className="ml-auto w-72 bg-slate-50 p-6 border border-slate-200 rounded-xl break-inside-avoid print:bg-slate-50 print:border-slate-300 print:w-64">
+        <div className="flex justify-between text-[11px] py-1 border-b border-slate-200 mb-2 print:border-slate-300">
+            <span className="text-slate-400 font-bold uppercase print:text-slate-600">Subtotal</span>
             <span className="font-black text-slate-800">${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>
         
         {/* Total Weight Display */}
-        <div className="flex justify-between text-[11px] py-1 border-b border-slate-200 mb-2">
-            <span className="text-slate-400 font-bold uppercase">Total Weight</span>
+        <div className="flex justify-between text-[11px] py-1 border-b border-slate-200 mb-2 print:border-slate-300">
+            <span className="text-slate-400 font-bold uppercase print:text-slate-600">Total Weight</span>
             <span className="font-black text-slate-800">{totalWeight.toFixed(2)} {unitLabel}</span>
         </div>
 
         {/* Logistics Calculated Display */}
         <div className="flex justify-between text-[11px] py-1 mb-2">
-            <span className="text-slate-400 font-bold uppercase">Logistics (Rate ${config.logisticsRate?.toFixed(2)})</span>
+            <span className="text-slate-400 font-bold uppercase print:text-slate-600">Logistics (Rate ${config.logisticsRate?.toFixed(2)})</span>
             <span className="font-black text-slate-800">${logisticsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>
         
-        <div className={`${config.isInvoice ? 'bg-red-600 text-white' : 'bg-black text-[#ffcd00]'} p-4 rounded-lg flex justify-between items-center mt-4`}>
-            <span className="uppercase text-xs font-black tracking-tight">{config.isInvoice ? 'Total Due' : 'Total Quote'}</span>
-            <span className="text-xl font-black">${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+        <div className={`${config.isInvoice ? 'bg-red-600 text-white' : 'bg-black text-[#ffcd00]'} p-4 rounded-lg flex justify-between items-center mt-4 print:border print:border-black`}>
+            <span className={`uppercase text-xs font-black tracking-tight ${!config.isInvoice && 'print:text-black'}`}>{config.isInvoice ? 'Total Due' : 'Total Quote'}</span>
+            <span className={`text-xl font-black ${!config.isInvoice && 'print:text-black'}`}>${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>
       </div>
 
       {/* Footer & Disclaimer */}
-      <div className="mt-16 break-inside-avoid">
-        <div className="mb-6 p-4 bg-slate-50 border border-slate-100 rounded text-justify">
-             <p className="text-[8px] text-slate-500 font-medium uppercase leading-relaxed tracking-wide">
+      <div className="mt-16 break-inside-avoid print:mt-12">
+        <div className="mb-6 p-4 bg-slate-50 border border-slate-100 rounded text-justify print:bg-white print:border-slate-200">
+             <p className="text-[8px] text-slate-500 font-medium uppercase leading-relaxed tracking-wide print:text-slate-600">
                 Seller makes no warranty, express or implied, with respect to the goods or services, including any warranty of merchantability or fitness for a particular purpose. The goods being sold are sold on an as-is, as they stand, with all faults basis, and seller disclaims any implied warranties with respect to said goods. All other warranty disclaimers contained herein are additionally applicable.
              </p>
         </div>
-        <div className="border-t border-slate-200 pt-6 text-[8px] text-slate-300 font-black text-center uppercase tracking-widest">
+        <div className="border-t border-slate-200 pt-6 text-[8px] text-slate-300 font-black text-center uppercase tracking-widest print:text-slate-400">
             © 2025 American Iron LLC. Derived from CAT Engineering Specs. Values valid until {expirationText}. Generated via Gemini AI.
         </div>
       </div>

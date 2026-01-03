@@ -148,7 +148,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 print:min-h-0 print:pb-0 print:bg-white">
       <ConfigPanel 
         onDataLoaded={handleDataLoaded}
         onConfigChange={setConfig}
