@@ -135,10 +135,10 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           <div className="h-12 w-px bg-slate-200 hidden md:block"></div>
           <div>
             <h2 className="text-xl font-black uppercase italic tracking-tighter text-slate-900 hidden md:block">Quoting Engine</h2>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Logistics & Engineering Intelligence</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Logistics & Engineering Intelligence</p>
           </div>
         </div>
-        <div className="text-[10px] text-slate-300 font-black uppercase tracking-[0.3em]">Build v9.7 [LBS/KG]</div>
+        <div className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Build v9.7 [LBS/KG]</div>
       </div>
 
       {/* AI Controls */}
@@ -162,7 +162,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       <div className="flex flex-col md:flex-row gap-4 mb-6">
          {/* File Operations */}
          <div className="bg-indigo-50 p-3 rounded-2xl border border-indigo-100 flex items-center gap-2">
-             <span className="text-[9px] font-black uppercase text-indigo-300 px-2 tracking-widest hidden lg:block">File</span>
+             <span className="text-[9px] font-black uppercase text-indigo-800 px-2 tracking-widest hidden lg:block">File</span>
              <button 
                 onClick={onSaveQuote}
                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black uppercase px-3 py-2 rounded-lg transition-colors flex items-center gap-1"
@@ -184,7 +184,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
 
          {/* Draft Operations */}
          <div className="bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center gap-2 flex-1">
-             <span className="text-[9px] font-black uppercase text-slate-400 px-2 tracking-widest hidden lg:block">Draft</span>
+             <span className="text-[9px] font-black uppercase text-slate-600 px-2 tracking-widest hidden lg:block">Draft</span>
              <button 
                 onClick={handleDraftSaveClick}
                 className={`text-[10px] font-black uppercase px-3 py-2 rounded-lg transition-all flex items-center gap-1 ${draftSavedMsg ? 'bg-green-500 text-white' : 'bg-slate-700 text-white hover:bg-slate-800'}`}
@@ -246,13 +246,13 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           <textarea
             value={textInput}
             onChange={(e) => setTextInput(e.target.value)}
-            className="w-full h-40 p-5 border border-slate-200 rounded-2xl shadow-inner text-sm font-mono text-black focus:ring-2 focus:ring-yellow-400 outline-none resize-none"
+            className="w-full h-40 p-5 bg-slate-900 border border-slate-700 rounded-2xl shadow-inner text-sm font-mono text-white placeholder:text-slate-500 focus:ring-2 focus:ring-yellow-400 outline-none resize-none"
             placeholder="Paste item rows here (Format: Part# Description $Price)..."
           />
         )}
         {(activeTab === ParseMode.PDF || activeTab === ParseMode.EXCEL) && (
           <label className="flex flex-col items-center justify-center w-full h-40 border-4 border-dashed border-slate-200 rounded-3xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2">
                 {activeTab === ParseMode.PDF ? 'Drag & Drop PDF' : 'Attach Excel/CSV'}
             </p>
             <input 
@@ -268,11 +268,11 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       {/* Configuration */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Markup Strategy</label>
+          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">Markup Strategy</label>
           <select 
             value={config.markupPercentage} 
             onChange={(e) => updateConfig('markupPercentage', parseInt(e.target.value))}
-            className="w-full p-2 bg-white border border-slate-200 rounded-xl font-black text-xs text-black outline-none"
+            className="w-full p-2 bg-slate-900 border border-slate-700 rounded-xl font-black text-xs text-white outline-none"
           >
             <option value="15">15% Margin</option>
             <option value="20">20% Margin</option>
@@ -283,7 +283,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         
         {/* Weight Unit Toggle */}
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
-            <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Weight Unit</label>
+            <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">Weight Unit</label>
             <div className="flex bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <button 
                     onClick={() => updateConfig('weightUnit', 'LBS')}
@@ -302,7 +302,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         </div>
 
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-             <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">Logistics ($/{config.weightUnit})</label>
+             <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">Logistics ($/{config.weightUnit})</label>
              <input 
                 type="number" 
                 step="0.01"
@@ -313,36 +313,36 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                     const val = e.target.value;
                     updateConfig('logisticsRate', val === '' ? 0 : parseFloat(val));
                 }}
-                className="w-full p-2.5 bg-white border border-slate-200 rounded-xl font-black text-xs text-black outline-none focus:border-yellow-400"
+                className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl font-black text-xs text-white outline-none focus:border-yellow-400"
              />
         </div>
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">{config.isInvoice ? 'Invoice Number' : 'Reference ID'}</label>
+          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">{config.isInvoice ? 'Invoice Number' : 'Reference ID'}</label>
           <input 
             type="text" 
             value={config.quoteId}
             onChange={(e) => updateConfig('quoteId', e.target.value)}
-            className="w-full p-2.5 border border-slate-200 rounded-xl font-black text-xs text-black uppercase outline-none focus:border-yellow-400"
+            className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl font-black text-xs text-white uppercase outline-none focus:border-yellow-400"
           />
         </div>
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-slate-400 mb-2 tracking-widest">{config.isInvoice ? 'Due Date' : 'Valid Until'}</label>
+          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">{config.isInvoice ? 'Due Date' : 'Valid Until'}</label>
           <input 
             type="date" 
             value={config.expirationDate}
             onChange={(e) => updateConfig('expirationDate', e.target.value)}
-            className="w-full p-2.5 border border-slate-200 rounded-xl font-black text-xs text-black uppercase outline-none focus:border-yellow-400"
+            className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl font-black text-xs text-white uppercase outline-none focus:border-yellow-400 [color-scheme:dark]"
           />
         </div>
       </div>
 
       {/* Client Info */}
       <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-8">
-        <div className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-4">Client Destination</div>
+        <div className="text-[9px] font-black uppercase text-black tracking-widest mb-4">Client Destination</div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input type="text" placeholder="Company Name" value={client.company} onChange={(e) => updateClient('company', e.target.value)} className="p-3 border border-slate-200 rounded-xl text-xs text-black font-bold outline-none focus:border-yellow-400" />
-          <input type="text" placeholder="Email Address" value={client.email} onChange={(e) => updateClient('email', e.target.value)} className="p-3 border border-slate-200 rounded-xl text-xs text-black font-bold outline-none focus:border-yellow-400" />
-          <input type="text" placeholder="Phone Number" value={client.phone} onChange={(e) => updateClient('phone', e.target.value)} className="p-3 border border-slate-200 rounded-xl text-xs text-black font-bold outline-none focus:border-yellow-400" />
+          <input type="text" placeholder="Company Name" value={client.company} onChange={(e) => updateClient('company', e.target.value)} className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-bold placeholder:text-slate-500 outline-none focus:border-yellow-400" />
+          <input type="text" placeholder="Email Address" value={client.email} onChange={(e) => updateClient('email', e.target.value)} className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-bold placeholder:text-slate-500 outline-none focus:border-yellow-400" />
+          <input type="text" placeholder="Phone Number" value={client.phone} onChange={(e) => updateClient('phone', e.target.value)} className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-bold placeholder:text-slate-500 outline-none focus:border-yellow-400" />
         </div>
       </div>
 
