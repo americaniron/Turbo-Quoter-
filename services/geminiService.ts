@@ -19,10 +19,10 @@ const getAiClient = () => {
 
 // Rate Limiting Queue Mechanism
 let requestQueue = Promise.resolve();
-const REQUEST_DELAY_MS = 2000;
+const REQUEST_DELAY_MS = 1500; // Slightly reduced delay for better UX
 
 /**
- * Generates an exact part photo using Imagen 4.0, falling back to Gemini 2.5 Flash.
+ * Generates an exact part photo using Imagen 4.0, falling back to Gemini 3 Pro Image.
  */
 export const generatePartImage = async (partNo: string, description: string): Promise<string | null> => {
   // Chain this request to the end of the queue
@@ -33,9 +33,22 @@ export const generatePartImage = async (partNo: string, description: string): Pr
     // Wait before executing to throttle
     await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY_MS));
     
-    const prompt = `Industrial component reference photo of ${partNo} ${description}. Engineering style, white background, metallic textures, studio lighting.`;
+    // Clean description to remove generic placeholders
+    const cleanDesc = description.replace(/CAT COMPONENT|CAT PART|ASSEMBLY/gi, '').trim();
+    const subject = cleanDesc ? `${cleanDesc} (${partNo})` : `Heavy Machinery Part ${partNo}`;
 
-    // Attempt 1: Imagen 4.0 (High Quality)
+    // Enhanced Prompt Engineering for Industrial Realism
+    const prompt = `
+      Professional studio photography of a specific industrial component: ${subject}.
+      Context: Heavy machinery replacement part, Caterpillar/Engineering style.
+      Material: Weathered cast iron, machined steel, or yellow industrial paint depending on part type.
+      Lighting: Soft-box studio lighting, rim light to define edges, high contrast.
+      Background: Isolated on pure white background (hex #FFFFFF).
+      Quality: 8k resolution, macro photorealistic, highly detailed textures, sharp focus.
+      View: Isometric 45-degree angle.
+    `.replace(/\s+/g, ' ').trim();
+
+    // Attempt 1: Imagen 4.0 (High Quality Generation)
     try {
         const response = await ai.models.generateImages({
             model: 'imagen-4.0-generate-001',
@@ -56,15 +69,28 @@ export const generatePartImage = async (partNo: string, description: string): Pr
         console.warn(`Imagen 4 gen failed for ${partNo}, trying fallback.`, error.message);
     }
 
-    // Attempt 2: Gemini 2.5 Flash Image (Fallback)
+    // Attempt 2: Gemini 3 Pro Image (High Fidelity Fallback)
+    // Upgraded from 2.5-flash-image for better quality
     try {
-      const fallbackPrompt = `Generate a realistic image of industrial part ${partNo} - ${description}. Isolated on white background.`;
+      const fallbackPrompt = `
+        Render a photorealistic heavy industrial part: ${subject}.
+        Style: Engineering Product Photography.
+        Material: Steel/Iron/Rubber. 
+        Background: Pure White.
+        Resolution: 2K, Highly detailed.
+      `.replace(/\s+/g, ' ').trim();
       
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
+        model: 'gemini-3-pro-image-preview',
         contents: {
           parts: [{ text: fallbackPrompt }]
         },
+        config: {
+            imageConfig: {
+                aspectRatio: "1:1",
+                imageSize: "1K"
+            }
+        }
       });
 
       for (const part of response.candidates?.[0]?.content?.parts || []) {
@@ -93,13 +119,14 @@ export const generatePartImage = async (partNo: string, description: string): Pr
  */
 export const analyzeQuoteData = async (items: QuoteItem[]): Promise<string> => {
   const ai = getAiClient();
-  if (!ai) return "AI Configuration Error: Missing API Key";
+  if (!ai) return "Configuration Error: Missing API Credentials";
 
   try {
     const prompt = `Analyze this parts list for a heavy machinery repair job: ${JSON.stringify(items)}. 
-    1. What is the likely repair goal? 
-    2. Suggest 2 missing items that are commonly associated with these parts. 
-    Keep it under 50 words.`;
+    1. Identify the likely repair system (e.g., Hydraulic System, Undercarriage, Engine Rebuild).
+    2. Note any critical missing components typically required for this job (e.g. 'Missing O-Ring Kit' or 'Check Fluid Levels').
+    3. Provide a professional, concise engineering summary (under 50 words).
+    Tone: Formal, Technical, Engineering Note. No AI self-reference.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -109,7 +136,7 @@ export const analyzeQuoteData = async (items: QuoteItem[]): Promise<string> => {
     return response.text || "Analysis unavailable.";
   } catch (error) {
     console.error("Analysis Error:", error);
-    return "AI Analysis service temporarily unavailable.";
+    return "Engineering analysis service temporarily unavailable.";
   }
 };
 
