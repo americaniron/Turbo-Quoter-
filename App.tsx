@@ -90,8 +90,8 @@ const App: React.FC = () => {
         if (json.items) setItems(json.items);
         if (json.client) setClient(json.client);
         if (json.config) setConfig(prev => ({ ...prev, ...json.config }));
-        if (json.customLogo) setCustomLogo(json.customLogo);
-        if (json.aiAnalysis) setAiAnalysis(json.aiAnalysis);
+        setCustomLogo(json.customLogo || null);
+        setAiAnalysis(json.aiAnalysis || null);
         
         // Scroll to preview after loading
         setTimeout(() => {
@@ -131,11 +131,12 @@ const App: React.FC = () => {
       const draft = localStorage.getItem('american_iron_draft');
       if (draft) {
         const json = JSON.parse(draft);
-        if (json.items) setItems(json.items);
-        if (json.client) setClient(json.client);
-        if (json.config) setConfig(prev => ({ ...prev, ...json.config }));
-        if (json.customLogo) setCustomLogo(json.customLogo);
-        if (json.aiAnalysis) setAiAnalysis(json.aiAnalysis);
+        // Correctly restore or reset values from draft
+        setItems(json.items || []);
+        setClient(json.client || { company: '', email: '', phone: '' });
+        setConfig(prev => ({ ...prev, ...json.config }));
+        setCustomLogo(json.customLogo || null);
+        setAiAnalysis(json.aiAnalysis || null);
         
         setTimeout(() => {
             resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });

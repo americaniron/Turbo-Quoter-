@@ -51,7 +51,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
   const expirationText = getExpirationDate();
 
   return (
-    <div className="w-[800px] mx-auto bg-white p-12 shadow-2xl mb-12 relative print:shadow-none print:w-full print:max-w-none print:p-[20mm] print:mb-0 print:mx-0">
+    <div className="w-[800px] mx-auto bg-white p-12 shadow-2xl mb-12 relative print:shadow-none print:w-full print:max-w-none print:p-12 print:mb-0 print:mx-0">
       {/* Quote Header */}
       <div className="flex justify-between items-start mb-10 print:mb-8">
         <div>
@@ -76,8 +76,9 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
         </div>
       </div>
 
-      {/* Client & AI Info Grid */}
+      {/* Client & Intelligence Grid */}
       <div className="grid grid-cols-2 gap-12 mt-10 mb-8 print:mt-4 print:mb-6 print:gap-8">
+        {/* Left Col: Client */}
         <div className="break-inside-avoid">
           <div className={`border-b-4 ${config.isInvoice ? 'border-red-600' : 'border-[#ffcd00]'} bg-slate-50 print:bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3 print:border-b-2`}>
             {config.isInvoice ? 'Bill To' : 'Client Recipient'}
@@ -89,14 +90,15 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
           </div>
         </div>
         
+        {/* Right Col: Engineering Insights (Formerly AI) */}
         {aiAnalysis && !config.isInvoice && (
-           <div className="print:hidden">
-            <div className="border-b-4 border-indigo-500 bg-indigo-50 px-3 py-2 font-bold uppercase text-[10px] text-indigo-900 mb-3 flex justify-between">
-                <span>AI Analysis & Suggestions</span>
-                <span className="text-[8px] bg-indigo-200 text-indigo-800 px-1 rounded">GEMINI 3</span>
+           <div className="break-inside-avoid flex flex-col h-full">
+            <div className="border-b-4 border-slate-600 bg-slate-100 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3 print:border-b-2 flex items-center justify-between">
+                <span>Engineering Summary</span>
+                <svg className="w-3 h-3 text-slate-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
             </div>
-            <div className="text-[10px] italic text-indigo-800 leading-relaxed font-semibold bg-indigo-50/50 p-3 rounded border border-indigo-100">
-                {aiAnalysis}
+            <div className="flex-1 text-[10px] text-slate-700 leading-relaxed font-medium bg-slate-50 p-4 rounded-r border border-slate-200 border-l-4 border-l-[#ffcd00] italic text-justify">
+                "{aiAnalysis}"
             </div>
           </div>
         )}
@@ -175,7 +177,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
             <span className="font-black text-slate-800">${logisticsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>
         
-        <div className={`${config.isInvoice ? 'bg-red-600 text-white' : 'bg-black text-[#ffcd00]'} p-4 rounded-lg flex justify-between items-center mt-4 print:border print:border-black`}>
+        <div className={`${config.isInvoice ? 'bg-red-600 text-white' : 'bg-black text-[#ffcd00] print:bg-white'} p-4 rounded-lg flex justify-between items-center mt-4 print:border print:border-black`}>
             <span className={`uppercase text-xs font-black tracking-tight ${!config.isInvoice && 'print:text-black'}`}>{config.isInvoice ? 'Total Due' : 'Total Quote'}</span>
             <span className={`text-xl font-black ${!config.isInvoice && 'print:text-black'}`}>${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
         </div>
@@ -189,7 +191,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
              </p>
         </div>
         <div className="border-t border-slate-200 pt-6 text-[8px] text-slate-300 font-black text-center uppercase tracking-widest print:text-slate-400">
-            © 2025 American Iron LLC. Derived from CAT Engineering Specs. Values valid until {expirationText}. Generated via Gemini AI.
+            © 2025 American Iron LLC. Derived from CAT Engineering Specs. Values valid until {expirationText}.
         </div>
       </div>
     </div>

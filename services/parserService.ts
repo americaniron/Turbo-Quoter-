@@ -38,15 +38,15 @@ function cleanDescription(text: string): string {
  */
 function extractWeight(text: string): number {
   // Enhanced regex to catch more unit variations (lbs, kg, kgs, kilogram, etc.)
-  // We match the first occurrence of a number followed by a weight unit.
-  const m = String(text).match(/(\d{1,4}(?:\.\d+)?)\s*(lb|lbs|kg|kgs|kilogram|kilograms|k\.g\.)\b/i);
+  // Also handles OCR errors like '1bs' for 'lbs' or 'k8' for 'kg' if necessary, though sticking to standard mostly.
+  const m = String(text).match(/(\d{1,4}(?:\.\d+)?)\s*(lb|lbs|1bs|kg|kgs|kilogram|kilograms|k\.g\.)\b/i);
   if (!m) return 0;
   
   const val = parseFloat(m[1]);
   const unit = (m[2] || "").toLowerCase();
   
   // Normalize everything to LBS for internal storage
-  if (unit.includes("kg") || unit.includes("kilogram")) {
+  if (unit.includes("kg") || unit.includes("kilogram") || unit.includes("k.g")) {
       return val * 2.20462;
   }
   
@@ -96,14 +96,20 @@ export const parseTextData = (text: string): QuoteItem[] => {
           const weight = extractWeight(block);
 
           // 3. Extract Part No
-          const partPattern = /(?:\b[A-Z0-9]{1,5}-[A-Z0-9]{3,7}\b|\b[A-Z0-9]{5,10}\b(?=\s*:?|[A-Z]))/i;
+          // Improved Part Regex to capture Cat-style parts (e.g. 9S-3245, 123-4567, or pure 7-digit 1234567)
+          // Be careful not to capture prices or line numbers.
+          const partPattern = /(?:\b[0-9A-Z]{1,5}-[0-9A-Z]{3,7}\b|\b[0-9]{5,8}\b(?=\s*:?|[A-Z]))/i;
           const partMatch = block.match(partPattern);
           let partNo = "";
           
-          // Avoid matching simple numbers as parts
-          if (partMatch && !/^\d+$/.test(partMatch[0])) {
-               partNo = partMatch[0];
-          } else {
+          if (partMatch) {
+               // Filter out common false positives like dates "2023" or short numbers
+               if (!/^\d{1,4}$/.test(partMatch[0])) {
+                   partNo = partMatch[0];
+               }
+          }
+          
+          if (!partNo) {
                // Try looking for colon pattern e.g. "388-7501:"
                const colonMatch = block.match(/([A-Z0-9\-]{5,12}):/);
                if (colonMatch) partNo = colonMatch[1];
@@ -172,7 +178,7 @@ export const parseTextData = (text: string): QuoteItem[] => {
       }
 
       // A. Extract Part Number
-      const partPatternLegacy = /(?:\b[A-Z0-9]{1,5}-[A-Z0-9]{3,7}\b|\b[A-Z0-9]{5,10}\b(?=\s*:?|[A-Z]))/ig;
+      const partPatternLegacy = /(?:\b[A-Z0-9]{1,5}-[A-Z0-9]{3,7}\b|\b[0-9]{5,10}\b(?=\s*:?|[A-Z]))/ig;
       let partNo = "";
       const colonMatch = block.match(/([A-Z0-9\-]{5,12}):/);
       if (colonMatch) {
@@ -274,59 +280,79 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
     
-    // Improved extraction: Sort by Y (top to bottom) then X (left to right)
+    // Improved extraction with intelligent line grouping (Better for scanned/skewed PDFs)
     const items = content.items.map((item: any) => ({
       str: item.str,
       x: item.transform[4],
       y: item.transform[5],
       width: item.width || 0,
+      height: item.height || 10, // Approximate height if missing
       hasEOL: item.hasEOL
     }));
 
-    // Sort by Y descending (top to bottom), then X ascending
-    items.sort((a: any, b: any) => {
-      const yDiff = b.y - a.y;
-      if (Math.abs(yDiff) > 4) return yDiff; // Row tolerance
-      return a.x - b.x; // Same line sorting
-    });
-
-    // Reconstruct Layout visually
-    let lastY = -1;
-    let lastXEnd = 0;
-    let pageText = "";
+    // Group items into logical lines based on Y-coordinate overlap
+    const lines: any[][] = [];
+    
+    // Sort raw items by Y descending to process top-to-bottom
+    items.sort((a: any, b: any) => b.y - a.y);
 
     for (const item of items) {
-      // New line detection
-      if (lastY !== -1 && Math.abs(item.y - lastY) > 4) {
-        pageText += "\n";
-        lastXEnd = 0;
-      }
-      
-      // Column spacing detection
-      if (lastXEnd > 0) {
-          const gap = item.x - lastXEnd;
-          if (gap > 20) {
-              pageText += "   "; // Wide gap -> column break
-          } else if (gap > 4) {
-              pageText += " "; // Small gap -> word break
-          }
-      }
-      
-      pageText += item.str;
-      lastY = item.y;
-      lastXEnd = item.x + item.width;
+        let placed = false;
+        // Try to fit into an existing line
+        for (const line of lines) {
+            const representative = line[0];
+            // If overlapping vertically significantly, assume same line
+            // Use 50% overlap of the smaller height as threshold
+            const overlapThreshold = Math.min(item.height, representative.height) * 0.5;
+            if (Math.abs(item.y - representative.y) < overlapThreshold) {
+                line.push(item);
+                placed = true;
+                break;
+            }
+        }
+        if (!placed) {
+            lines.push([item]);
+        }
+    }
+
+    // Sort lines themselves by Y descending (Top of page to Bottom)
+    lines.sort((a, b) => b[0].y - a[0].y);
+
+    // Sort items within each line by X ascending (Left to Right) and construct string
+    let pageText = "";
+    for (const line of lines) {
+        line.sort((a, b) => a.x - b.x);
+        
+        let lastXEnd = 0;
+        let lineStr = "";
+        
+        for (const item of line) {
+            // Add spacing based on X gap
+            if (lastXEnd > 0) {
+                const gap = item.x - lastXEnd;
+                if (gap > 20) {
+                    lineStr += "   "; // Column break
+                } else if (gap > 4) {
+                    lineStr += " "; // Word break
+                }
+            }
+            lineStr += item.str;
+            lastXEnd = item.x + item.width;
+        }
+        pageText += lineStr + "\n";
     }
     
     fullStructureText += pageText + "\n";
   }
   
-  // Attempt 1: Standard Regex Parsing
+  // Attempt 1: Standard Regex Parsing with cleaned text
   const regexItems = parseTextData(fullStructureText);
   
   // SMART FALLBACK:
-  // If regex returns very few items (< 3) but the document is large, it might be a false positive.
-  // FORCE AI parsing in that case.
-  const seemsValid = regexItems.length > 2 || (regexItems.length > 0 && fullStructureText.length < 500);
+  // Use AI if regex returns nothing OR very few items relative to text length.
+  // We expect at least one item per ~1000 chars of text for a dense list.
+  const densityCheck = regexItems.length > 0 && (fullStructureText.length / regexItems.length) < 2000;
+  const seemsValid = regexItems.length > 2 || densityCheck;
 
   if (seemsValid) {
     console.log("Regex parsing successful:", regexItems.length, "items");
