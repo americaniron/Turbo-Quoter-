@@ -93,7 +93,7 @@ const App: React.FC = () => {
         if (json.config) {
             // Sanitize Config: Ensure markup is one of the valid positive options
             const rawMarkup = json.config.markupPercentage;
-            const validMarkups = [10, 15, 20, 25, 30];
+            const validMarkups = [10, 15, 20, 25, 30, 35, 40];
             let safeMarkup = rawMarkup;
             
             // If strictly not in list or negative, default to 25
@@ -172,7 +172,7 @@ const App: React.FC = () => {
         
         // Sanitize Config for Drafts too
         if (json.config) {
-            const validMarkups = [10, 15, 20, 25, 30];
+            const validMarkups = [10, 15, 20, 25, 30, 35, 40];
             let safeMarkup = json.config.markupPercentage || 25;
             if (!validMarkups.includes(safeMarkup)) safeMarkup = 25;
 

@@ -420,6 +420,8 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
             <option value="20">20% Increase</option>
             <option value="25">25% Increase</option>
             <option value="30">30% Increase</option>
+            <option value="35">35% Increase</option>
+            <option value="40">40% Increase</option>
           </select>
         </div>
         

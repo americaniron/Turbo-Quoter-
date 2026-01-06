@@ -12,7 +12,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700;900&display=swap" rel="stylesheet">
     <script>
         // Polyfill process.env safely
-        window.process = window.process || { env: { API_KEY: '' } };
+        try {
+            if (!window.process) {
+                window.process = { env: { API_KEY: '' } };
+            } else if (!window.process.env) {
+                // If process exists but env doesn't, try to assign env
+                try {
+                    window.process.env = { API_KEY: '' };
+                } catch (e) {
+                    console.warn('Unable to polyfill process.env');
+                }
+            }
+        } catch (e) {
+            console.warn('Unable to polyfill window.process', e);
+        }
         
         window.onload = function() {
             if (window.pdfjsLib) {
