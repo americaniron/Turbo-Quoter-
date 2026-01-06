@@ -39,13 +39,13 @@ export const generatePartImage = async (partNo: string, description: string): Pr
 
     // Enhanced Prompt Engineering for Industrial Realism
     const prompt = `
-      Professional studio photography of a specific industrial component: ${subject}.
-      Context: Heavy machinery replacement part, Caterpillar/Engineering style.
-      Material: Weathered cast iron, machined steel, or yellow industrial paint depending on part type.
-      Lighting: Soft-box studio lighting, rim light to define edges, high contrast.
-      Background: Isolated on pure white background (hex #FFFFFF).
-      Quality: 8k resolution, macro photorealistic, highly detailed textures, sharp focus.
+      Macro commercial product photography of a heavy industrial Caterpillar component: ${subject}.
+      Material: Authentic weathered cast iron, machined steel, grease, and industrial 'Caterpillar Yellow' paint where applicable.
+      Lighting: Cinematic Rembrandt lighting, high contrast, rim lighting to accentuate metal edges.
+      Setting: Clean, white infinite studio background.
+      Details: Visible serial numbers, metallic texture, oil sheen, heavy-duty engineering aesthetic.
       View: Isometric 45-degree angle.
+      Quality: 8k resolution, photorealistic, sharp focus.
     `.replace(/\s+/g, ' ').trim();
 
     // Attempt 1: Imagen 4.0 (High Quality Generation)
@@ -70,14 +70,12 @@ export const generatePartImage = async (partNo: string, description: string): Pr
     }
 
     // Attempt 2: Gemini 3 Pro Image (High Fidelity Fallback)
-    // Upgraded from 2.5-flash-image for better quality
     try {
       const fallbackPrompt = `
-        Render a photorealistic heavy industrial part: ${subject}.
-        Style: Engineering Product Photography.
-        Material: Steel/Iron/Rubber. 
-        Background: Pure White.
-        Resolution: 2K, Highly detailed.
+        Create a photorealistic image of a heavy duty industrial machine part: ${subject}.
+        Style: Engineering Product Photography, white background.
+        Texture: Metal, Steel, Iron, Cat Yellow Paint.
+        Lighting: Studio Softbox.
       `.replace(/\s+/g, ' ').trim();
       
       const response = await ai.models.generateContent({
@@ -160,13 +158,13 @@ export const parseDocumentWithAI = async (text: string): Promise<QuoteItem[]> =>
     Identify the main table of items. 
     
     Data Cleanliness Rules:
-    - **Description**: Must NOT contain weight (e.g. 0.1 lbs), availability (e.g. 8 in stock), dates (e.g. Jan 02), or status (e.g. Non-returnable).
+    - **Description**: Include technical specs (e.g. Dimensions, Fits Model X, Kit Includes). Do not include weight or availability dates.
     - **Unit Price**: Identify the single unit price (often marked with 'ea'). Do not confuse it with the Total line price.
     
     Return a STRICT JSON array of objects. Each object must have:
     - qty: number (default 1)
     - partNo: string (Look for Part Number, SKU like 123-4567)
-    - desc: string (Clean description only)
+    - desc: string (Clean description)
     - weight: number (in LBS. If missing, use 0)
     - unitPrice: number (Price per item, no currency symbols)
 

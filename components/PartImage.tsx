@@ -30,24 +30,24 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, enabl
 
   if (loading) {
     return (
-      <div className="w-[100px] h-[100px] bg-white border border-slate-200 rounded-md flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-slate-200 border-t-yellow-400 rounded-full animate-spin"></div>
+      <div className="w-full h-full bg-white flex items-center justify-center">
+        <div className="w-4 h-4 border-2 border-slate-200 border-t-yellow-400 rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (imageUrl) {
     return (
-      <div className="w-[100px] h-[100px] bg-white border border-slate-200 rounded-md overflow-hidden flex items-center justify-center p-1">
-        <img src={imageUrl} alt={partNo} className="w-full h-full object-contain" />
+      <div className="w-full h-full bg-white flex items-center justify-center">
+        <img src={imageUrl} alt={partNo} className="max-w-full max-h-full object-contain" />
       </div>
     );
   }
 
   // Fallback / Placeholder
   return (
-    <div className="w-[100px] h-[100px] bg-slate-50 border border-slate-200 rounded-md flex items-center justify-center text-center p-1">
-      <span className="text-[10px] font-black text-slate-300 uppercase leading-tight">
+    <div className="w-full h-full bg-slate-50 flex items-center justify-center text-center p-1">
+      <span className="text-[9px] font-black text-slate-300 uppercase leading-tight">
         CAT<br/>{partNo.substring(0, 5)}
       </span>
     </div>

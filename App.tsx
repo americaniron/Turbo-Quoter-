@@ -124,19 +124,34 @@ const App: React.FC = () => {
     reader.readAsText(file);
   };
 
-  // --- Feature: Save as Draft (Local Storage) ---
-  const handleSaveDraft = () => {
+  // --- Feature: Save as Draft (Granular Local Storage) ---
+  const handleSaveDraft = (options: { items: boolean; client: boolean; config: boolean }) => {
     try {
-      const data = {
-        version: 'draft',
-        timestamp: new Date().toISOString(),
-        items,
-        client,
-        config,
-        customLogo,
-        aiAnalysis
-      };
-      localStorage.setItem('american_iron_draft', JSON.stringify(data));
+      // 1. Get existing draft to preserve unselected sections
+      const existingDraftStr = localStorage.getItem('american_iron_draft');
+      let draftData = existingDraftStr ? JSON.parse(existingDraftStr) : {};
+
+      // 2. Update metadata
+      draftData.version = 'draft';
+      draftData.timestamp = new Date().toISOString();
+
+      // 3. Update only selected sections
+      if (options.items) {
+          draftData.items = items;
+          draftData.aiAnalysis = aiAnalysis; // AI analysis is tied to items
+      }
+      
+      if (options.client) {
+          draftData.client = client;
+      }
+      
+      if (options.config) {
+          draftData.config = config;
+          draftData.customLogo = customLogo; // Logo is part of config/branding
+      }
+
+      // 4. Save back to storage
+      localStorage.setItem('american_iron_draft', JSON.stringify(draftData));
       setHasDraft(true);
     } catch (e) {
       console.error(e);
@@ -150,22 +165,26 @@ const App: React.FC = () => {
       const draft = localStorage.getItem('american_iron_draft');
       if (draft) {
         const json = JSON.parse(draft);
-        setItems(json.items || []);
-        setClient(json.client || { company: '', email: '', phone: '' });
+        
+        // We only restore what is present in the draft
+        if (json.items) setItems(json.items);
+        if (json.client) setClient(json.client);
         
         // Sanitize Config for Drafts too
-        const validMarkups = [10, 15, 20, 25, 30];
-        let safeMarkup = json.config?.markupPercentage || 25;
-        if (!validMarkups.includes(safeMarkup)) safeMarkup = 25;
+        if (json.config) {
+            const validMarkups = [10, 15, 20, 25, 30];
+            let safeMarkup = json.config.markupPercentage || 25;
+            if (!validMarkups.includes(safeMarkup)) safeMarkup = 25;
 
-        setConfig(prev => ({ 
-            ...prev, 
-            ...json.config,
-            markupPercentage: safeMarkup
-        }));
+            setConfig(prev => ({ 
+                ...prev, 
+                ...json.config,
+                markupPercentage: safeMarkup
+            }));
+        }
         
-        setCustomLogo(json.customLogo || null);
-        setAiAnalysis(json.aiAnalysis || null);
+        if (json.customLogo) setCustomLogo(json.customLogo);
+        if (json.aiAnalysis) setAiAnalysis(json.aiAnalysis);
         
         setTimeout(() => {
             resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });

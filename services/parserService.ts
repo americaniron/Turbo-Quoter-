@@ -5,30 +5,35 @@ import { parseDocumentWithAI } from './geminiService.ts';
 
 /**
  * Clean string to remove generic labels and ensure only item details remain.
+ * UPDATED: Optimized to be "Inclusive" of technical specs while removing admin noise.
  */
 function cleanDescription(text: string): string {
   if (!text) return "CAT COMPONENT";
   
+  // 1. First, remove specific invoice/document artifacts that are definitely noise.
   let cleaned = String(text)
-    // Remove known noise phrases and Financial Headers
-    .replace(/Ring Power|RING POWER CORPORATION|Tampa|Riverview|Fern Hill|Order Information|Pickup Location|Pickup Method|SUMMARY OF CHARGES|Items In Your Order|Availability|Notes|Quantity|Product Description|Product Description Notes|Total Price|Line Item|Unit Price|Extended Price|Weight|Date|Invoice|Page|Reference|Ship To|Bill To/gi, "")
-    // Remove specific financial noise
+    // Remove Admin/Layout Headers
+    .replace(/Ring Power|RING POWER CORPORATION|Tampa|Riverview|Fern Hill|Order Information|Pickup Location|Pickup Method|SUMMARY OF CHARGES|Items In Your Order|Page \d+ of \d+|Invoice No|Document Date/gi, "")
+    // Remove Column Headers (Be careful not to remove 'Weight' if it's part of a spec like 'Counterweight')
+    .replace(/\b(Unit Price|Extended Price|Total Price|Product Description|Line Item)\b/gi, "")
+    // Remove Financial Noise
     .replace(/SHIPPING\/MISCELLANEOUS|TOTAL TAX|ORDER TOTAL|SUBTOTAL|\(USD\)|USD|TAX:/gi, "")
-    // Remove standalone prices that might be in the description
+    // Remove standalone prices/totals that might be floating in the text
     .replace(/\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g, "")
-    // Remove "Non-returnable part" and similar status messages
-    .replace(/Non-returnable part|Factory Stock|Backorder/gi, "")
-    // Remove Availability patterns (e.g. "All 4 by Jan 02", "8 in stock")
+    // Remove Status messages, but keep "Kit" or "Set" related info if possible
+    .replace(/Non-returnable part|Factory Stock|Backorder|Subject to availability/gi, "")
+    // Remove Warehouse/Availability codes
     .replace(/All\s+\d+\s+by\s+[A-Za-z]{3}\s+\d{1,2}/gi, "")
     .replace(/\d+\s+in\s+stock/gi, "")
-    // Remove Weight strings (e.g. "0.1 lbs") from description to keep it clean
-    .replace(/\d{1,4}(?:\.\d+)?\s*(?:lb|lbs|kg|kgs)\b/gi, "")
-    // Remove quotes
+    // Remove Quotes
     .replace(/["']/g, "")
     .trim();
 
-  // Remove leading numbers if they look like line numbers (e.g. "1) " or "1 ")
-  cleaned = cleaned.replace(/^\d+\)\s*/, "").replace(/^\d+\s+/, "");
+  // 2. Remove leading line numbers (e.g., "1) ", "10 ", "001 ")
+  cleaned = cleaned.replace(/^(?:\d{1,4}\s*[:.)-]\s*)+/, "");
+
+  // 3. Clean up excessive whitespace created by removals
+  cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
   
   return cleaned;
 }
@@ -125,17 +130,6 @@ function determineCorrectPrice(text: string, qty: number): number {
         // 3. Fallback: Safety Division
         // If we only have ONE price and Qty > 1, that price is ambiguous.
         // It could be the Unit Price (if column detection failed) or the Total.
-        // However, usually PDF extraction gets the Total.
-        // We can't know for sure. But based on user feedback "prices decreased", 
-        // it means we likely picked a too-small number before.
-        // If we pick the Max here, we risk over-quoting (Total * Qty).
-        // BUT, picking the Max is safer for the "Increase" requirement than picking a tiny fee.
-        
-        // Let's rely on the explicit sorted list. If we couldn't match math, 
-        // and we have >1 prices, we took the 2nd highest.
-        // If we have 1 price: assume it is the Unit Price (Standard Invoice format often lists Unit Price).
-        // Extended price is often far to the right and might be missed in column cutoffs, 
-        // whereas Unit Price is central.
         return prices[0];
     }
 
@@ -159,7 +153,6 @@ export const parseTextData = (text: string): QuoteItem[] => {
           const end = (i + 1 < lineMatches.length) ? lineMatches[i+1].index! : raw.length;
           const block = raw.substring(start, end);
           
-          // Pre-extract Qty to help Price Determination
           let qty = 1;
           const currentLineNum = lineMatches[i][1];
           const qtyMatch = block.match(new RegExp(`(?:^|\\n)\\s*${currentLineNum}\\)\\s+(\\d+)`));
@@ -167,14 +160,11 @@ export const parseTextData = (text: string): QuoteItem[] => {
               qty = parseInt(qtyMatch[1]);
           }
 
-          // 1. Identify Price using Genius Logic
           let unitPrice = determineCorrectPrice(block, qty);
           if (unitPrice === 0) continue; 
 
-          // 2. Extract Weight
           const weight = extractWeight(block);
 
-          // 3. Extract Part No
           const partPattern = /(?:\b[0-9A-Z]{1,5}-[0-9A-Z]{3,7}\b|\b[0-9]{5,8}\b(?=\s*:?|[A-Z]))/i;
           const partMatch = block.match(partPattern);
           let partNo = "";
@@ -192,18 +182,18 @@ export const parseTextData = (text: string): QuoteItem[] => {
           if (partNo.endsWith("-")) partNo = partNo.slice(0, -1);
           if (!partNo) partNo = `ITEM-${i+1}`;
 
-          // Re-check Qty via PartNo proximity if initial check failed
           if (qty === 1 && partNo) {
              const escPart = partNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
              const qm = block.match(new RegExp(`(?:^|[\\s\\n",])(\\d{1,5})\\s*(?=["']?${escPart})`, 'i'));
              if (qm) qty = parseInt(qm[1]);
           }
 
-          // 5. Extract Description
           let desc = cleanDescription(block);
-          if (partNo && partNo !== `ITEM-${i+1}`) {
+          // Only split by partNo if partNo is actually IN the description string to avoid deleting random numbers
+          if (partNo && partNo !== `ITEM-${i+1}` && desc.includes(partNo)) {
               const parts = desc.split(partNo);
-              if (parts.length > 1) desc = parts.pop() || "";
+              // Take the part after the part number, as usually Desc follows PartNo
+              if (parts.length > 1) desc = parts.slice(1).join(" ");
           }
           
           desc = desc.replace(/^[:\s-]+/g, "").replace(/\s+/g, " ").trim();
@@ -236,7 +226,6 @@ export const parseTextData = (text: string): QuoteItem[] => {
       }
 
       // Re-evaluate price for this block using the Genius Logic
-      // (The hit only found ONE price, but the block might have others)
       const calculatedPrice = determineCorrectPrice(block, qty);
       const finalPrice = calculatedPrice > 0 ? calculatedPrice : hits[i].unitPrice;
 
@@ -262,9 +251,9 @@ export const parseTextData = (text: string): QuoteItem[] => {
       if (!partNo) partNo = `ITEM-${i+1}`;
 
       let desc = cleanDescription(block);
-      if (partNo && partNo !== `ITEM-${i+1}`) {
+      if (partNo && partNo !== `ITEM-${i+1}` && desc.includes(partNo)) {
           const parts = desc.split(partNo);
-          if (parts.length > 1) desc = parts.pop() || "";
+          if (parts.length > 1) desc = parts.slice(1).join(" ");
       }
       desc = desc.replace(/^[:\s-]+/g, "").replace(/\s+/g, " ").trim();
       if (!desc) desc = "CAT COMPONENT";
@@ -291,34 +280,130 @@ export const parseExcelFile = async (file: File): Promise<QuoteItem[]> => {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const wb = window.XLSX.read(data, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const rows: any[][] = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-        if (rows.length < 2) {
+        if (!rows || rows.length === 0) {
           resolve([]);
           return;
         }
 
-        const headers = rows[0].map((h: any) => String(h).toLowerCase());
-        const getIdx = (keys: string[]) => headers.findIndex((h: string) => keys.some(k => h.includes(k)));
+        // 1. Intelligent Header Detection
+        // Scan first 25 rows to find the "Attribute Layer"
+        let headerIdx = -1;
+        const colMap = { qty: -1, part: -1, desc: -1, price: -1, weight: -1 };
+        
+        const terms = {
+            part: ['part', 'number', 'item', 'sku', 'pn', 'material'],
+            desc: ['description', 'desc', 'product', 'name', 'details'],
+            qty: ['qty', 'quantity', 'count', 'pcs'],
+            price: ['price', 'unit', 'cost', 'rate', 'ea'],
+            weight: ['weight', 'wt', 'lbs', 'kg']
+        };
 
-        const qi = getIdx(['qty', 'quantity']);
-        const pi = getIdx(['part', 'pn', 'number']);
-        const di = getIdx(['desc', 'description']);
-        const ci = getIdx(['price', 'unit', 'cost']);
-        const wi = getIdx(['weight', 'wt']);
+        const normalize = (s: any) => String(s).toLowerCase().replace(/[^a-z]/g, '');
 
-        const items: QuoteItem[] = rows.slice(1)
-          .map(r => ({
-            qty: qi > -1 ? (parseInt(r[qi]) || 1) : 1,
-            partNo: pi > -1 ? String(r[pi] || "CAT-PART") : "CAT-PART",
-            desc: di > -1 ? String(r[di] || "CAT COMPONENT") : "CAT COMPONENT",
-            unitPrice: ci > -1 ? parseFloat(String(r[ci] || "0").replace(/[^0-9.]/g, "")) : 0,
-            weight: wi > -1 ? parseFloat(String(r[wi] || "0")) : 0
-          }))
-          .filter(x => x.unitPrice > 0);
+        for (let i = 0; i < Math.min(rows.length, 25); i++) {
+            const row = rows[i];
+            // Check row for critical mass of keywords
+            let matches = 0;
+            const cells = row.map(normalize);
+            
+            if (cells.some(c => terms.part.some(t => c.includes(t)))) matches++;
+            if (cells.some(c => terms.price.some(t => c.includes(t)))) matches++;
+            if (cells.some(c => terms.desc.some(t => c.includes(t)))) matches++;
+            
+            if (matches >= 2) {
+                headerIdx = i;
+                // Map columns
+                row.forEach((cellRaw: any, idx: number) => {
+                    const cell = normalize(cellRaw);
+                    if (terms.qty.some(t => cell.includes(t))) colMap.qty = idx;
+                    else if (terms.price.some(t => cell.includes(t)) && !cell.includes('total') && !cell.includes('ext')) colMap.price = idx;
+                    else if (terms.part.some(t => cell.includes(t))) colMap.part = idx;
+                    else if (terms.desc.some(t => cell.includes(t))) colMap.desc = idx;
+                    else if (terms.weight.some(t => cell.includes(t))) colMap.weight = idx;
+                });
+                break;
+            }
+        }
+
+        // 2. Data Extraction
+        const items: QuoteItem[] = [];
+        const startRow = headerIdx === -1 ? 0 : headerIdx + 1;
+
+        // Fallback mapping if no header found (Column Position Guessing)
+        if (headerIdx === -1) {
+             // Heuristic: If 4+ columns, assume A=Part, B=Desc, C=Qty, D=Price
+             colMap.part = 0;
+             colMap.desc = 1;
+             colMap.qty = 2;
+             colMap.price = 3;
+        }
+
+        for (let i = startRow; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || row.length === 0) continue;
+            
+            // Skip footer/total rows
+            const rowStr = row.join('').toLowerCase();
+            if ((rowStr.includes('total') || rowStr.includes('subtotal')) && rowStr.length < 50) continue;
+
+            // Extract Values
+            const getVal = (idx: number) => (idx > -1 && row[idx] !== undefined) ? row[idx] : null;
+
+            // Qty
+            let qty = 1;
+            const rawQty = getVal(colMap.qty);
+            if (rawQty !== null) {
+                const q = parseInt(String(rawQty).replace(/[^0-9]/g, ''));
+                if (q > 0) qty = q;
+            }
+
+            // Price
+            let unitPrice = 0;
+            const rawPrice = getVal(colMap.price);
+            if (rawPrice !== null) {
+                if (typeof rawPrice === 'number') unitPrice = rawPrice;
+                else {
+                    const p = parseFloat(String(rawPrice).replace(/[^0-9.]/g, ''));
+                    if (!isNaN(p)) unitPrice = p;
+                }
+            }
+
+            // Part
+            let partNo = "CAT-PART";
+            const rawPart = getVal(colMap.part);
+            if (rawPart) partNo = String(rawPart).trim();
+            else if (headerIdx === -1 && typeof row[0] === 'string') partNo = row[0]; // Fallback
+
+            // Desc
+            let desc = "CAT COMPONENT";
+            const rawDesc = getVal(colMap.desc);
+            if (rawDesc) desc = cleanDescription(String(rawDesc));
+            else if (headerIdx === -1 && typeof row[1] === 'string') desc = cleanDescription(row[1]); // Fallback
+
+            // Weight
+            let weight = 0;
+            const rawWeight = getVal(colMap.weight);
+            if (rawWeight) weight = extractWeight(String(rawWeight));
+
+            // Heuristic Fixes for "No Header" mode
+            if (headerIdx === -1) {
+                 // Try to find a price in the row if we missed it
+                 if (unitPrice === 0) {
+                     const num = row.find((c: any) => typeof c === 'number' && c > 0);
+                     if (num) unitPrice = num;
+                 }
+            }
+
+            if (unitPrice > 0) {
+                items.push({ qty, partNo, desc, weight, unitPrice });
+            }
+        }
 
         resolve(items);
       } catch (err) {
+        console.error("Excel Parsing Error", err);
         reject(err);
       }
     };
@@ -424,9 +509,10 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
 
      // Description
      let desc = cleanDescription(item.rawText);
-     if (pNo && pNo !== "ITEM") {
+     // Only split if partNo exists and is distinct from the item label
+     if (pNo && pNo !== "ITEM" && desc.includes(pNo)) {
          const parts = desc.split(pNo);
-         if (parts.length > 1) desc = parts.pop() || "";
+         if (parts.length > 1) desc = parts.slice(1).join(" ");
      }
      desc = desc.replace(/^[:\s-]+/g, "").replace(/\s+/g, " ").trim();
      if (!desc) desc = "CAT COMPONENT";
@@ -444,11 +530,11 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
       // Filter total noise
       if (!rowText) continue;
       
-      // Enhanced Noise Filtering
+      // Enhanced Noise Filtering, but PERMISSIVE for continuation lines
       if (rowText.match(/^Page \d/i) || rowText.match(/Invoice|Ship To|Bill To|Sold To|P\.O\.|Date:|Terms:|Due Date/i)) continue;
-
-      if (!/[a-zA-Z0-9]/.test(rowText)) continue;
-      if (rowText.length < 3 && !/\d/.test(rowText) && !/ea/i.test(rowText)) continue;
+      
+      // Stop scanning if we hit the Totals section
+      if (rowText.match(/Subtotal|Total Tax|Total Amount|Balance Due/i)) break;
 
       // Check if this row initiates a new item
       // REQUIREMENT: Must have a price symbol '$' to be considered a valid item start in complex docs
@@ -458,8 +544,14 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
           if (currentItem) finalizeItem(currentItem);
           currentItem = { rawText: rowText };
       } else {
+          // INCLUSIVE DESCRIPTION LOGIC:
+          // If we have an active item, assume this line is a continuation of the description
+          // (e.g. "Includes Seals", "Dim: 5x5") unless it looks like a page footer.
           if (currentItem) {
-              currentItem.rawText += " " + rowText;
+              // Only filter really garbage characters if appending
+              if (/[a-zA-Z0-9]/.test(rowText)) {
+                  currentItem.rawText += " " + rowText;
+              }
           }
       }
   }

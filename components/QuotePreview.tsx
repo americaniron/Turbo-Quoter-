@@ -12,212 +12,144 @@ interface QuotePreviewProps {
   customLogo: string | null;
 }
 
-export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, config, aiEnabled, aiAnalysis, customLogo }) => {
+export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, config, aiEnabled, customLogo }) => {
   if (items.length === 0) return null;
 
   const markupMultiplier = 1 + (config.markupPercentage / 100);
-  
-  // Weights are stored in LBS. Convert for display/calculation if KG is selected.
-  // 1 LB = 0.453592 KG
   const conversionFactor = config.weightUnit === 'KG' ? 0.453592 : 1;
-  const unitLabel = config.weightUnit;
+  const unitLabel = config.weightUnit === 'KG' ? 'kg' : 'lbs';
 
-  // Calculate Total Weight in the SELECTED unit
   const totalWeight = items.reduce((sum, item) => sum + (item.weight * conversionFactor * item.qty), 0);
-  
-  // Logistics Cost = Total Weight (in selected unit) * Rate (per selected unit)
   const logisticsCost = totalWeight * (config.logisticsRate || 0);
-
   const subtotal = items.reduce((sum, item) => sum + (item.unitPrice * markupMultiplier * item.qty), 0);
   const total = subtotal + logisticsCost;
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-        month: 'long', 
-        day: 'numeric', 
-        year: 'numeric'
-    }).toUpperCase();
-  };
-  
-  const today = formatDate(new Date());
-  
-  // Safe date parsing ensuring no issues with timezones on basic YYYY-MM-DD
-  const getExpirationDate = () => {
-      if (!config.expirationDate) return 'UNDEFINED';
-      const [y, m, d] = config.expirationDate.split('-').map(Number);
-      return formatDate(new Date(y, m - 1, d));
-  };
-
-  const expirationText = getExpirationDate();
-
   return (
-    <div className="w-[800px] mx-auto bg-white p-12 shadow-2xl mb-12 relative print:shadow-none print:w-full print:max-w-none print:p-12 print:mb-0 print:mx-0">
-      {/* Quote Header */}
-      <div className="flex justify-between items-start mb-10 print:mb-8">
-        <div>
-          {/* Logo Component */}
-          {customLogo ? (
-            <img src={customLogo} alt="Company Logo" className="h-32 print:h-20 w-auto object-contain mb-2 block print:block" />
-          ) : (
-            <Logo className="h-32 print:h-20 w-auto object-contain mb-2 block print:block" />
-          )}
-          <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] pl-1 print:text-slate-600">
-            {config.isInvoice ? 'Commercial Invoice & Logistics' : 'Engineering Component Logistics'}
-          </p>
-        </div>
-        <div className="text-right pt-4">
-          <p className="text-sm font-black text-slate-800">
-             {config.isInvoice ? 'INVOICE #:' : 'REF:'} {config.quoteId}
-          </p>
-          <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 print:text-slate-600">DATE: {today}</p>
-          <p className={`text-[10px] font-bold uppercase mt-1 ${config.isInvoice ? 'text-slate-900' : 'text-red-500'}`}>
-            {config.isInvoice ? 'DUE DATE:' : 'VALID UNTIL:'} {expirationText}
-          </p>
-        </div>
+    <div className="max-w-[1000px] mx-auto bg-white p-12 min-h-screen text-[#333] font-sans print:p-8 print:w-full print:max-w-none">
+      {/* Document Header (Client Info / Logo) - Clean Invoice Style */}
+      <div className="flex justify-between items-start mb-12 border-b border-gray-200 pb-8">
+         <div className="w-1/2">
+            {customLogo ? (
+                <img src={customLogo} alt="Logo" className="h-16 object-contain mb-4" />
+            ) : (
+                <Logo className="h-16 w-auto mb-4 text-black" />
+            )}
+            <div className="text-sm text-gray-600">
+                <p className="font-bold uppercase tracking-wide text-xs text-gray-400 mb-1">Bill To:</p>
+                <p className="font-bold text-gray-800">{client.company || 'Client Company'}</p>
+                <p>{client.email}</p>
+                <p>{client.phone}</p>
+            </div>
+         </div>
+         <div className="text-right w-1/2">
+             <h1 className="text-3xl font-bold text-gray-800 tracking-tight mb-2">
+                {config.isInvoice ? 'INVOICE' : 'QUOTE'}
+             </h1>
+             <div className="text-sm text-gray-600 space-y-1">
+                 <div className="flex justify-end gap-4">
+                     <span className="font-bold text-gray-400 text-xs uppercase pt-1">Reference:</span>
+                     <span className="font-bold">{config.quoteId}</span>
+                 </div>
+                 <div className="flex justify-end gap-4">
+                     <span className="font-bold text-gray-400 text-xs uppercase pt-1">Date:</span>
+                     <span>{new Date().toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}</span>
+                 </div>
+                 <div className="flex justify-end gap-4">
+                     <span className="font-bold text-gray-400 text-xs uppercase pt-1">{config.isInvoice ? 'Due:' : 'Expires:'}</span>
+                     <span>{config.expirationDate}</span>
+                 </div>
+             </div>
+         </div>
       </div>
 
-      {/* Client & Intelligence Grid */}
-      <div className="grid grid-cols-2 gap-12 mt-10 mb-8 print:mt-4 print:mb-6 print:gap-8">
-        {/* Left Col: Client */}
-        <div className="break-inside-avoid">
-          <div className={`border-b-4 ${config.isInvoice ? 'border-red-600' : 'border-[#ffcd00]'} bg-slate-50 print:bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3 print:border-b-2`}>
-            {config.isInvoice ? 'Bill To' : 'Client Recipient'}
-          </div>
-          <div className="text-xs space-y-1 pl-1">
-            <p className="font-black text-slate-900 uppercase">{client.company || 'Valued Customer'}</p>
-            <p className="text-slate-500 font-bold print:text-slate-700">{client.email}</p>
-            <p className="text-slate-500 font-bold print:text-slate-700">{client.phone}</p>
-          </div>
-        </div>
+      {/* Main List Section */}
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-gray-800 mb-2">Items In Your Order</h2>
+        <div className="w-full border-t border-gray-300"></div>
         
-        {/* Right Col: Engineering Insights (Formerly AI) */}
-        {aiAnalysis && !config.isInvoice && (
-           <div className="break-inside-avoid flex flex-col h-full shadow-lg rounded-lg overflow-hidden border border-slate-300 relative print:shadow-none print:border-slate-800">
-            {/* Header */}
-            <div className="bg-slate-900 px-4 py-3 flex items-center justify-between border-b-2 border-[#ffcd00] print:bg-slate-800">
-                 <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#ffcd00] animate-pulse print:hidden"></span>
-                    <span className="font-black uppercase text-[10px] text-white tracking-widest leading-none">
-                        System Diagnostic & Recommendations
-                    </span>
-                 </div>
-                 <svg className="w-4 h-4 text-[#ffcd00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-            </div>
-            
-            {/* Body */}
-            <div className="flex-1 bg-yellow-50 p-4 relative print:bg-white">
-                 {/* Decorative Watermark */}
-                 <div className="absolute -bottom-4 -right-4 p-4 opacity-[0.05] pointer-events-none print:hidden">
-                    <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
-                 </div>
+        <table className="w-full text-left border-collapse">
+            <thead>
+                <tr className="border-b border-gray-300 text-[13px] font-bold text-gray-600 h-10">
+                    <th className="py-2 w-10 text-center"></th> {/* Line # */}
+                    <th className="py-2 w-16 text-center">Quantity</th>
+                    <th className="py-2 pl-4">Product Description</th>
+                    <th className="py-2 w-24">Notes</th>
+                    <th className="py-2 w-32">Availability</th>
+                    <th className="py-2 w-32 text-right">Total Price (USD)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {items.map((item, idx) => {
+                    const unitPrice = item.unitPrice * markupMultiplier;
+                    const lineTotal = unitPrice * item.qty;
+                    const displayWeight = (item.weight * conversionFactor).toFixed(1);
 
-                 {/* Content */}
-                 <p className="text-[10px] text-slate-800 font-medium leading-relaxed font-mono text-justify relative z-10">
-                    "{aiAnalysis}"
-                 </p>
-
-                 {/* Call to Action Badge */}
-                 <div className="mt-4 flex items-center justify-between border-t border-yellow-200 pt-3">
-                     <div className="flex items-center gap-2">
-                        <span className="bg-[#ffcd00] text-black text-[8px] font-black px-2 py-1 uppercase rounded print:border print:border-black">Action Required</span>
-                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wide">Review Missing Components</span>
-                     </div>
-                 </div>
-            </div>
-          </div>
-        )}
+                    return (
+                        <tr key={idx} className="border-b border-gray-200 text-[13px] group break-inside-avoid">
+                            <td className="py-6 text-gray-500 font-medium align-top text-center">{idx + 1})</td>
+                            <td className="py-6 text-gray-900 font-medium align-top text-center">{item.qty}</td>
+                            <td className="py-6 pl-4 align-top">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-20 h-20 flex-shrink-0 bg-white border border-gray-100 flex items-center justify-center p-1">
+                                         <PartImage partNo={item.partNo} description={item.desc} enableAI={aiEnabled} />
+                                    </div>
+                                    <div className="pt-1">
+                                        <div className="font-bold text-gray-800 leading-tight">
+                                            {item.partNo}: {item.desc}
+                                        </div>
+                                        <div className="text-gray-500 mt-1">
+                                            {displayWeight} {unitLabel}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td className="py-6 text-gray-500 align-top pt-7">
+                                {/* Notes empty */}
+                            </td>
+                            <td className="py-6 text-gray-800 align-top pt-7">
+                                <span className="text-green-600 font-bold">{item.qty}</span> in stock
+                            </td>
+                            <td className="py-6 text-right align-top pt-7">
+                                <div className="font-bold text-gray-900 text-sm">
+                                    ${lineTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                    ${unitPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} ea.
+                                </div>
+                            </td>
+                        </tr>
+                    );
+                })}
+            </tbody>
+        </table>
       </div>
 
-      {/* Items Table */}
-      <div className={`border-b-4 ${config.isInvoice ? 'border-red-600' : 'border-[#ffcd00]'} bg-slate-50 print:bg-slate-50 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3 print:border-b-2`}>
-        {config.isInvoice ? 'Invoice Detail' : 'Component Assessment'}
+      {/* Footer Totals */}
+      <div className="flex justify-end mt-4 break-inside-avoid">
+         <div className="w-[350px]">
+             <div className="flex justify-between items-center py-1">
+                 <span className="text-[13px] font-bold text-gray-700 uppercase tracking-tight">Order Subtotal:</span>
+                 <span className="text-[13px] text-gray-600 font-medium">${subtotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (USD)</span>
+             </div>
+             <div className="flex justify-between items-center py-1">
+                 <span className="text-[13px] font-bold text-gray-700 uppercase tracking-tight">Shipping/Miscellaneous:</span>
+                 <span className="text-[13px] text-gray-600 font-medium">${logisticsCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (USD)</span>
+             </div>
+             <div className="flex justify-between items-center py-1">
+                 <span className="text-[13px] font-bold text-gray-700 uppercase tracking-tight">Total Tax:</span>
+                 <span className="text-[13px] text-gray-600 font-medium">$0.00 (USD)</span>
+             </div>
+             <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-300">
+                 <span className="text-[14px] font-black text-gray-800 uppercase tracking-tight">Order Total:</span>
+                 <span className="text-[14px] font-black text-gray-800">${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (USD)</span>
+             </div>
+         </div>
       </div>
       
-      <table className="w-full border-collapse mb-8 print:mb-6">
-        <thead>
-          <tr className="break-inside-avoid">
-            <th className="text-center border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-10">Line</th>
-            <th className="text-center border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-12">Qty</th>
-            <th className="text-left border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-28">Reference</th>
-            <th className="text-left border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600">Part Description</th>
-            <th className="text-center border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-20">Weight</th>
-            <th className="text-right border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-24">Unit Val</th>
-            <th className="text-right border-b-2 border-black py-3 px-1 text-[10px] font-black uppercase text-slate-600 w-24">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item, idx) => {
-            const unitPrice = item.unitPrice * markupMultiplier;
-            const lineTotal = unitPrice * item.qty;
-            const displayWeight = item.weight * conversionFactor;
-            
-            return (
-              <tr key={idx} className="border-b border-slate-100 group break-inside-avoid print:border-slate-300">
-                <td className="py-4 px-1 align-top text-center text-xs font-bold text-slate-400 print:text-slate-600">{idx + 1}</td>
-                <td className="py-4 px-1 align-top text-center text-sm font-black text-slate-800">{item.qty}</td>
-                <td className="py-4 px-1 align-top">
-                    {/* Exact Part Photo Generation handled in Component */}
-                    <div className="print:grayscale">
-                        <PartImage partNo={item.partNo} description={item.desc} enableAI={aiEnabled} />
-                    </div>
-                </td>
-                <td className="py-4 px-1 align-top">
-                  <p className="font-black text-xs uppercase text-slate-900 mb-1">{item.partNo}</p>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase leading-tight whitespace-pre-wrap break-words print:text-slate-800">{item.desc}</p>
-                </td>
-                <td className="py-4 px-1 align-top text-center">
-                    <span className="font-bold text-[10px] text-slate-700">{displayWeight.toFixed(2)}</span>
-                    <br/>
-                    <span className="text-[8px] text-slate-300 font-black print:text-slate-500">{unitLabel}</span>
-                </td>
-                <td className="py-4 px-1 align-top text-right font-bold text-xs text-slate-600 print:text-slate-800">
-                  ${unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-                <td className="py-4 px-1 align-top text-right font-black text-xs text-slate-900">
-                  ${lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      {/* Totals Section */}
-      <div className="ml-auto w-72 bg-slate-50 p-6 border border-slate-200 rounded-xl break-inside-avoid print:bg-slate-50 print:border-slate-300 print:w-64">
-        <div className="flex justify-between text-[11px] py-1 border-b border-slate-200 mb-2 print:border-slate-300">
-            <span className="text-slate-400 font-bold uppercase print:text-slate-600">Subtotal</span>
-            <span className="font-black text-slate-800">${subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-        </div>
-        
-        {/* Total Weight Display */}
-        <div className="flex justify-between text-[11px] py-1 border-b border-slate-200 mb-2 print:border-slate-300">
-            <span className="text-slate-400 font-bold uppercase print:text-slate-600">Total Weight</span>
-            <span className="font-black text-slate-800">{totalWeight.toFixed(2)} {unitLabel}</span>
-        </div>
-
-        {/* Logistics Calculated Display */}
-        <div className="flex justify-between text-[11px] py-1 mb-2">
-            <span className="text-slate-400 font-bold uppercase print:text-slate-600">Logistics (Rate ${config.logisticsRate?.toFixed(2)})</span>
-            <span className="font-black text-slate-800">${logisticsCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-        </div>
-        
-        <div className={`${config.isInvoice ? 'bg-red-600 text-white' : 'bg-black text-[#ffcd00] print:bg-white'} p-4 rounded-lg flex justify-between items-center mt-4 print:border print:border-black`}>
-            <span className={`uppercase text-xs font-black tracking-tight ${!config.isInvoice && 'print:text-black'}`}>{config.isInvoice ? 'Total Due' : 'Total Quote'}</span>
-            <span className={`text-xl font-black ${!config.isInvoice && 'print:text-black'}`}>${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-        </div>
-      </div>
-
-      {/* Footer & Disclaimer */}
-      <div className="mt-16 break-inside-avoid print:mt-12">
-        <div className="mb-6 p-4 bg-slate-50 border border-slate-100 rounded text-justify print:bg-white print:border-slate-200">
-             <p className="text-[8px] text-slate-500 font-medium uppercase leading-relaxed tracking-wide print:text-slate-600">
-                Seller makes no warranty, express or implied, with respect to the goods or services, including any warranty of merchantability or fitness for a particular purpose. The goods being sold are sold on an as-is, as they stand, with all faults basis, and seller disclaims any implied warranties with respect to said goods. All other warranty disclaimers contained herein are additionally applicable.
-             </p>
-        </div>
-        <div className="border-t border-slate-200 pt-6 text-[8px] text-slate-300 font-black text-center uppercase tracking-widest print:text-slate-400">
-            © 2025 American Iron LLC. Derived from CAT Engineering Specs. Values valid until {expirationText}.
-        </div>
-      </div>
+      {/* Print-only Legal Footer to replicate full document feel */}
+       <div className="mt-16 pt-8 border-t border-gray-100 text-[10px] text-gray-400 text-center print:block hidden">
+          Derived from CAT Engineering Specs. Subject to Availability.
+       </div>
     </div>
   );
 };

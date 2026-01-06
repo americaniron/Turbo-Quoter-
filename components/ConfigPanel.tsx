@@ -1,7 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppConfig, ClientInfo, ParseMode, QuoteItem } from '../types.ts';
 import { parseTextData, parsePdfFile, parseExcelFile } from '../services/parserService.ts';
 import { Logo } from './Logo.tsx';
+
+interface DraftSaveOptions {
+  items: boolean;
+  client: boolean;
+  config: boolean;
+}
 
 interface ConfigPanelProps {
   onDataLoaded: (items: QuoteItem[]) => void;
@@ -11,7 +17,7 @@ interface ConfigPanelProps {
   onAnalyze: () => void;
   onSaveQuote: () => void;
   onLoadQuote: (file: File) => void;
-  onSaveDraft: () => void;
+  onSaveDraft: (options: DraftSaveOptions) => void;
   onResumeDraft: () => void;
   hasDraft: boolean;
   aiEnabled: boolean;
@@ -43,6 +49,28 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   const [client, setClient] = useState<ClientInfo>({ company: '', email: '', phone: '' });
   const [status, setStatus] = useState("Ready");
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
+
+  // Draft Menu State
+  const [isDraftMenuOpen, setIsDraftMenuOpen] = useState(false);
+  const [draftOptions, setDraftOptions] = useState<DraftSaveOptions>({
+      items: true,
+      client: true,
+      config: true
+  });
+  const draftMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close draft menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (draftMenuRef.current && !draftMenuRef.current.contains(event.target as Node)) {
+        setIsDraftMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleProcess = async () => {
     setStatus("Processing...");
@@ -110,10 +138,15 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       window.location.href = `mailto:${client.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
   
-  const handleDraftSaveClick = () => {
-      onSaveDraft();
+  const handleConfirmDraftSave = () => {
+      onSaveDraft(draftOptions);
       setDraftSavedMsg(true);
+      setIsDraftMenuOpen(false);
       setTimeout(() => setDraftSavedMsg(false), 2000);
+  };
+
+  const toggleDraftOption = (key: keyof DraftSaveOptions) => {
+      setDraftOptions(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
@@ -183,10 +216,11 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
          </div>
 
          {/* Draft Operations */}
-         <div className="bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center gap-2 flex-1">
+         <div className="bg-slate-100 p-3 rounded-2xl border border-slate-200 flex items-center gap-2 flex-1 relative" ref={draftMenuRef}>
              <span className="text-[9px] font-black uppercase text-slate-600 px-2 tracking-widest hidden lg:block">Draft</span>
+             
              <button 
-                onClick={handleDraftSaveClick}
+                onClick={() => setIsDraftMenuOpen(!isDraftMenuOpen)}
                 className={`text-[10px] font-black uppercase px-3 py-2 rounded-lg transition-all flex items-center gap-1 ${draftSavedMsg ? 'bg-green-500 text-white' : 'bg-slate-700 text-white hover:bg-slate-800'}`}
              >
                 {draftSavedMsg ? (
@@ -197,10 +231,55 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                 ) : (
                     <>
                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                         Save Draft
+                         Save Draft...
                     </>
                 )}
              </button>
+
+             {/* Draft Options Dropdown */}
+             {isDraftMenuOpen && (
+                 <div className="absolute top-full left-0 mt-2 bg-white border border-slate-200 shadow-2xl rounded-xl p-4 w-64 z-50 animate-in fade-in slide-in-from-top-2">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-100 pb-2">Select Data to Save</p>
+                     
+                     <div className="space-y-2 mb-4">
+                         <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                             <input 
+                                type="checkbox" 
+                                checked={draftOptions.items} 
+                                onChange={() => toggleDraftOption('items')}
+                                className="rounded text-indigo-600 focus:ring-indigo-500" 
+                             />
+                             <span className="text-xs font-bold text-slate-700">Line Items & AI Analysis</span>
+                         </label>
+                         <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                             <input 
+                                type="checkbox" 
+                                checked={draftOptions.client} 
+                                onChange={() => toggleDraftOption('client')}
+                                className="rounded text-indigo-600 focus:ring-indigo-500" 
+                             />
+                             <span className="text-xs font-bold text-slate-700">Client Details</span>
+                         </label>
+                         <label className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded">
+                             <input 
+                                type="checkbox" 
+                                checked={draftOptions.config} 
+                                onChange={() => toggleDraftOption('config')}
+                                className="rounded text-indigo-600 focus:ring-indigo-500" 
+                             />
+                             <span className="text-xs font-bold text-slate-700">Configuration & Logo</span>
+                         </label>
+                     </div>
+
+                     <button 
+                        onClick={handleConfirmDraftSave}
+                        className="w-full bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase py-2 rounded-lg transition-colors"
+                     >
+                         Confirm Save
+                     </button>
+                 </div>
+             )}
+
              {hasDraft && (
                  <button 
                     onClick={onResumeDraft}
