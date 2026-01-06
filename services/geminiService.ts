@@ -35,17 +35,22 @@ export const generatePartImage = async (partNo: string, description: string): Pr
     
     // Clean description to remove generic placeholders
     const cleanDesc = description.replace(/CAT COMPONENT|CAT PART|ASSEMBLY/gi, '').trim();
-    const subject = cleanDesc ? `${cleanDesc} (${partNo})` : `Heavy Machinery Part ${partNo}`;
-
-    // Enhanced Prompt Engineering for Industrial Realism
+    
+    // STRICT "EXACT PART" PROMPT
     const prompt = `
-      Macro commercial product photography of a heavy industrial Caterpillar component: ${subject}.
-      Material: Authentic weathered cast iron, machined steel, grease, and industrial 'Caterpillar Yellow' paint where applicable.
-      Lighting: Cinematic Rembrandt lighting, high contrast, rim lighting to accentuate metal edges.
-      Setting: Clean, white infinite studio background.
-      Details: Visible serial numbers, metallic texture, oil sheen, heavy-duty engineering aesthetic.
-      View: Isometric 45-degree angle.
-      Quality: 8k resolution, photorealistic, sharp focus.
+      Create a strictly accurate, photorealistic catalog product image for Caterpillar Part Number: ${partNo}.
+      Item Description: ${cleanDesc}.
+
+      Directives:
+      1. EXACT MATCH: Use deep technical knowledge of Part Number "${partNo}" to determine the specific shape, form factor, and material.
+      2. MATERIAL REALISM: 
+         - If the part is a Seal/O-Ring/Gasket -> Render as black rubber or polymer.
+         - If the part is a Filter -> Render as a canister (White/Yellow) or element.
+         - If the part is Hardware (Bolt/Nut) -> Render as Zinc-plated or steel.
+         - Only use "Caterpillar Yellow" paint if it is a large structural casting or housing.
+      3. CONDITION: Brand New, Factory Clean. Do NOT add grease, rust, weathering, or artistic "grime".
+      4. COMPOSITION: Isolated object, Pure White Background (#FFFFFF), Studio Lighting, Isometric View.
+      5. Do not generate a generic engine block unless the part number specifically refers to one.
     `.replace(/\s+/g, ' ').trim();
 
     // Attempt 1: Imagen 4.0 (High Quality Generation)
@@ -71,11 +76,12 @@ export const generatePartImage = async (partNo: string, description: string): Pr
 
     // Attempt 2: Gemini 3 Pro Image (High Fidelity Fallback)
     try {
+      // Fallback needs to be equally strict
       const fallbackPrompt = `
-        Create a photorealistic image of a heavy duty industrial machine part: ${subject}.
-        Style: Engineering Product Photography, white background.
-        Texture: Metal, Steel, Iron, Cat Yellow Paint.
-        Lighting: Studio Softbox.
+        Generate a photorealistic white-background catalog image of this specific spare part: ${partNo} (${cleanDesc}).
+        Crucial: The image must be technically accurate to the part number. 
+        If it is a small part (seal, bolt, sensor), show that specific small part, not a large machine.
+        Style: Commercial Product Photography, Studio Lighting, Factory New.
       `.replace(/\s+/g, ' ').trim();
       
       const response = await ai.models.generateContent({
