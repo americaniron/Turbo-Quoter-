@@ -268,16 +268,17 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       {/* Configuration */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">Markup Strategy</label>
+          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">Pricing Update</label>
           <select 
             value={config.markupPercentage} 
             onChange={(e) => updateConfig('markupPercentage', parseInt(e.target.value))}
             className="w-full p-2 bg-slate-900 border border-slate-700 rounded-xl font-black text-xs text-white outline-none"
           >
-            <option value="15">15% Margin</option>
-            <option value="20">20% Margin</option>
-            <option value="25">25% Margin</option>
-            <option value="30">30% Margin</option>
+            <option value="10">10% Increase</option>
+            <option value="15">15% Increase</option>
+            <option value="20">20% Increase</option>
+            <option value="25">25% Increase</option>
+            <option value="30">30% Increase</option>
           </select>
         </div>
         

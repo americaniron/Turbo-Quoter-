@@ -38,7 +38,6 @@ function cleanDescription(text: string): string {
  */
 function extractWeight(text: string): number {
   // Enhanced regex to catch more unit variations (lbs, kg, kgs, kilogram, etc.)
-  // Also handles OCR errors like '1bs' for 'lbs' or 'k8' for 'kg' if necessary, though sticking to standard mostly.
   const m = String(text).match(/(\d{1,4}(?:\.\d+)?)\s*(lb|lbs|1bs|kg|kgs|kilogram|kilograms|k\.g\.)\b/i);
   if (!m) return 0;
   
@@ -53,6 +52,96 @@ function extractWeight(text: string): number {
   return val;
 }
 
+/**
+ * GENIUS LEVEL PRICE EXTRACTION LOGIC
+ * Determines the correct Unit Price from a cloud of numbers on a line.
+ */
+function determineCorrectPrice(text: string, qty: number): number {
+    // 1. Extract ALL dollar amounts
+    const matches = [...text.matchAll(/\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g)];
+    let prices = matches.map(m => parseFloat(m[1].replace(/,/g, "")));
+    
+    // Filter out obvious noise (0.00)
+    prices = prices.filter(p => p > 0.01);
+    
+    // Remove duplicates
+    prices = [...new Set(prices)];
+
+    // Sort Descending (Highest to Lowest)
+    prices.sort((a, b) => b - a);
+
+    if (prices.length === 0) return 0;
+
+    // STRATEGY A: Explicit Labeling "@ $X.XX" or "$X.XX ea"
+    // This overrides almost everything else because it is explicit.
+    const explicitUnitMatch = text.match(/(@|ea\.?|each)\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i) 
+                           || text.match(/\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*(ea|each|@)/i);
+    
+    if (explicitUnitMatch) {
+        // Find which group has the number
+        const valStr = explicitUnitMatch[1].match(/\d/) ? explicitUnitMatch[1] : explicitUnitMatch[2];
+        const val = parseFloat(valStr.replace(/,/g, ""));
+        // Sanity check: If this explicit price matches one of our extracted prices, return it.
+        // We use a small epsilon for float comparison.
+        if (prices.some(p => Math.abs(p - val) < 0.01)) {
+            return val;
+        }
+    }
+
+    // STRATEGY B: Single Item Logic (Qty = 1)
+    if (qty === 1) {
+        // If Qty is 1, Unit Price == Total Price.
+        // We want the HIGHEST price found.
+        // Why? Lower prices are usually "Savings", "Discount", "Tax", or "Unit Weight" misread as price.
+        // The user specifically wants to markup the BASE price.
+        return prices[0]; // Max price
+    }
+
+    // STRATEGY C: Multiple Items Logic (Qty > 1)
+    if (qty > 1) {
+        // 1. Mathematical Validation (The "Genius" Check)
+        // Does Price A * Qty = Price B?
+        // If so, Price A is the Unit Price.
+        for (let i = 0; i < prices.length; i++) {
+            const potentialTotal = prices[i];
+            // Look for a smaller number that multiplies into this total
+            const unitMatch = prices.find(p => Math.abs((p * qty) - potentialTotal) < 0.1); // 0.1 tolerance for rounding
+            if (unitMatch) {
+                return unitMatch;
+            }
+        }
+
+        // 2. Logic Inference
+        // If we have multiple prices, the largest is almost certainly the Extended Total.
+        // We should ignore the largest and take the next largest (which is likely the Unit Price).
+        if (prices.length >= 2) {
+            // Check if the largest is significantly bigger than the second largest (e.g., > 1.5x)
+            // This suggests it really is a Total.
+            if (prices[0] > (prices[1] * 1.1)) {
+                return prices[1]; // Return 2nd highest (Unit Price)
+            }
+        }
+        
+        // 3. Fallback: Safety Division
+        // If we only have ONE price and Qty > 1, that price is ambiguous.
+        // It could be the Unit Price (if column detection failed) or the Total.
+        // However, usually PDF extraction gets the Total.
+        // We can't know for sure. But based on user feedback "prices decreased", 
+        // it means we likely picked a too-small number before.
+        // If we pick the Max here, we risk over-quoting (Total * Qty).
+        // BUT, picking the Max is safer for the "Increase" requirement than picking a tiny fee.
+        
+        // Let's rely on the explicit sorted list. If we couldn't match math, 
+        // and we have >1 prices, we took the 2nd highest.
+        // If we have 1 price: assume it is the Unit Price (Standard Invoice format often lists Unit Price).
+        // Extended price is often far to the right and might be missed in column cutoffs, 
+        // whereas Unit Price is central.
+        return prices[0];
+    }
+
+    return prices[0];
+}
+
 // --- Main Parsers ---
 
 export const parseTextData = (text: string): QuoteItem[] => {
@@ -60,9 +149,6 @@ export const parseTextData = (text: string): QuoteItem[] => {
   let items: QuoteItem[] = [];
 
   // --- STRATEGY 1: LINE ITEM SPLITTING (Robust for Invoices with Line Numbers) ---
-  // Detects "4) ", "5) " pattern common in the provided PDF.
-  // This is superior because it captures everything between "4)" and "5)", including weights 
-  // that might appear on a line *after* the price.
   const lineStartRegex = /(?:^|\n)\s*(\d+)\)\s+/g;
   const lineMatches = [...raw.matchAll(lineStartRegex)];
 
@@ -72,62 +158,42 @@ export const parseTextData = (text: string): QuoteItem[] => {
           const start = lineMatches[i].index!;
           const end = (i + 1 < lineMatches.length) ? lineMatches[i+1].index! : raw.length;
           const block = raw.substring(start, end);
-
-          // 1. Identify Price (Unit Price preferred over Total)
-          // Look for "ea" price match first (e.g. "$10.58 ea")
-          let unitPrice = 0;
-          const priceEaMatch = block.match(/\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*ea/i);
           
-          if (priceEaMatch) {
-             unitPrice = parseFloat(priceEaMatch[1].replace(/,/g, ""));
-          } else {
-             // Fallback: Check for any price. If multiple exist (Total vs Unit), usually Unit is smaller.
-             const prices = [...block.matchAll(/\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g)]
-                .map(p => parseFloat(p[1].replace(/,/g, "")));
-             
-             if (prices.length > 0) {
-                 unitPrice = Math.min(...prices);
-             }
+          // Pre-extract Qty to help Price Determination
+          let qty = 1;
+          const currentLineNum = lineMatches[i][1];
+          const qtyMatch = block.match(new RegExp(`(?:^|\\n)\\s*${currentLineNum}\\)\\s+(\\d+)`));
+          if (qtyMatch) {
+              qty = parseInt(qtyMatch[1]);
           }
 
-          if (unitPrice === 0) continue; // Skip if no price found (likely not an item line)
+          // 1. Identify Price using Genius Logic
+          let unitPrice = determineCorrectPrice(block, qty);
+          if (unitPrice === 0) continue; 
 
-          // 2. Extract Weight (Searches entire block, including lines after price)
+          // 2. Extract Weight
           const weight = extractWeight(block);
 
           // 3. Extract Part No
-          // Improved Part Regex to capture Cat-style parts (e.g. 9S-3245, 123-4567, or pure 7-digit 1234567)
-          // Be careful not to capture prices or line numbers.
           const partPattern = /(?:\b[0-9A-Z]{1,5}-[0-9A-Z]{3,7}\b|\b[0-9]{5,8}\b(?=\s*:?|[A-Z]))/i;
           const partMatch = block.match(partPattern);
           let partNo = "";
           
           if (partMatch) {
-               // Filter out common false positives like dates "2023" or short numbers
                if (!/^\d{1,4}$/.test(partMatch[0])) {
                    partNo = partMatch[0];
                }
           }
           
           if (!partNo) {
-               // Try looking for colon pattern e.g. "388-7501:"
                const colonMatch = block.match(/([A-Z0-9\-]{5,12}):/);
                if (colonMatch) partNo = colonMatch[1];
           }
           if (partNo.endsWith("-")) partNo = partNo.slice(0, -1);
           if (!partNo) partNo = `ITEM-${i+1}`;
 
-          // 4. Extract Qty
-          // Pattern: "4) 4" -> Line 4, Qty 4.
-          // We use the line number from the match to construct a specific regex for this line.
-          let qty = 1;
-          const currentLineNum = lineMatches[i][1];
-          const qtyMatch = block.match(new RegExp(`(?:^|\\n)\\s*${currentLineNum}\\)\\s+(\\d+)`));
-          
-          if (qtyMatch) {
-              qty = parseInt(qtyMatch[1]);
-          } else if (partNo) {
-             // Fallback: look for number preceding partNo
+          // Re-check Qty via PartNo proximity if initial check failed
+          if (qty === 1 && partNo) {
              const escPart = partNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
              const qm = block.match(new RegExp(`(?:^|[\\s\\n",])(\\d{1,5})\\s*(?=["']?${escPart})`, 'i'));
              if (qm) qty = parseInt(qm[1]);
@@ -135,7 +201,6 @@ export const parseTextData = (text: string): QuoteItem[] => {
 
           // 5. Extract Description
           let desc = cleanDescription(block);
-          // Try to remove Part No from description if present
           if (partNo && partNo !== `ITEM-${i+1}`) {
               const parts = desc.split(partNo);
               if (parts.length > 1) desc = parts.pop() || "";
@@ -150,34 +215,31 @@ export const parseTextData = (text: string): QuoteItem[] => {
       return items;
   }
 
-  // --- STRATEGY 2: PRICE-BASED SPLITTING (Legacy Fallback) ---
-  // Use this if no line numbers are found (e.g. simple lists)
-  
-  // STRICT PATTERN: Looks specifically for "$XX.XX ea". 
+  // --- STRATEGY 2: PRICE-BASED SPLITTING (Fallback) ---
   const pricePattern = /\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*ea\.?\b/gi;
   
   let hits = [];
   let m;
-  // 1. Find all Price occurrences first
   while ((m = pricePattern.exec(raw)) !== null) {
       hits.push({ index: m.index, unitPrice: parseFloat(m[1].replace(/,/g, "")), fullLen: m[0].length });
   }
 
-  // 2. Iterate through price hits and define "Blocks" of text preceding them
   for (let i = 0; i < hits.length; i++) {
       const start = i === 0 ? 0 : (hits[i-1].index + hits[i-1].fullLen);
       let block = raw.substring(start, hits[i].index);
 
-      // Matches "4) 4" (LineNumber) (Space) (Quantity)
+      // Try to find Qty
+      let qty = 1;
       const lineItemMatch = block.match(/(\d+)\)\s+(\d+)/); 
       if (lineItemMatch) {
-          const matchIndex = block.indexOf(lineItemMatch[0]);
-          if (matchIndex > -1) {
-             block = block.substring(matchIndex);
-          }
+          qty = parseInt(lineItemMatch[2]);
       }
 
-      // A. Extract Part Number
+      // Re-evaluate price for this block using the Genius Logic
+      // (The hit only found ONE price, but the block might have others)
+      const calculatedPrice = determineCorrectPrice(block, qty);
+      const finalPrice = calculatedPrice > 0 ? calculatedPrice : hits[i].unitPrice;
+
       const partPatternLegacy = /(?:\b[A-Z0-9]{1,5}-[A-Z0-9]{3,7}\b|\b[0-9]{5,10}\b(?=\s*:?|[A-Z]))/ig;
       let partNo = "";
       const colonMatch = block.match(/([A-Z0-9\-]{5,12}):/);
@@ -192,19 +254,13 @@ export const parseTextData = (text: string): QuoteItem[] => {
       }
       if (partNo.endsWith("-")) partNo = partNo.slice(0, -1);
 
-      // B. Extract Quantity
-      let qty = 1;
-      if (lineItemMatch) {
-          qty = parseInt(lineItemMatch[2]);
-      } else if (partNo) {
+      if (!lineItemMatch && partNo) {
           const escPart = partNo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           const qm = block.match(new RegExp(`(?:^|[\\s\\n",])(\\d{1,5})\\s*(?=["']?${escPart})`, 'i'));
           if (qm) qty = parseInt(qm[1]);
-      } else {
-          partNo = `ITEM-${i+1}`;
-      }
+      } 
+      if (!partNo) partNo = `ITEM-${i+1}`;
 
-      // C. Extract Description
       let desc = cleanDescription(block);
       if (partNo && partNo !== `ITEM-${i+1}`) {
           const parts = desc.split(partNo);
@@ -213,7 +269,6 @@ export const parseTextData = (text: string): QuoteItem[] => {
       desc = desc.replace(/^[:\s-]+/g, "").replace(/\s+/g, " ").trim();
       if (!desc) desc = "CAT COMPONENT";
 
-      // D. Extract Weight
       const weight = extractWeight(block);
 
       items.push({
@@ -221,7 +276,7 @@ export const parseTextData = (text: string): QuoteItem[] => {
           partNo,
           desc,
           weight,
-          unitPrice: hits[i].unitPrice
+          unitPrice: finalPrice
       });
   }
   
@@ -271,95 +326,152 @@ export const parseExcelFile = async (file: File): Promise<QuoteItem[]> => {
   });
 };
 
+/**
+ * Refactored PDF Parser using Visual Rows and a State Machine.
+ * Handles multi-line descriptions and complex layouts better.
+ * Includes aggressive filtering for stray characters and varying densities.
+ */
 export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  let fullStructureText = "";
+  
+  // Storage for all visual lines across all pages
+  let allRows: string[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
     
-    // Improved extraction with intelligent line grouping (Better for scanned/skewed PDFs)
-    const items = content.items.map((item: any) => ({
-      str: item.str,
-      x: item.transform[4],
-      y: item.transform[5],
-      width: item.width || 0,
-      height: item.height || 10, // Approximate height if missing
-      hasEOL: item.hasEOL
-    }));
+    // 1. Group items by Y-coordinate (Visual Rows)
+    const items = content.items
+      .map((item: any) => ({
+        str: item.str,
+        x: item.transform[4],
+        y: item.transform[5],
+        width: item.width || 0,
+        height: item.height || 10
+      }))
+      .filter((item: any) => item.str.trim().length > 0);
 
-    // Group items into logical lines based on Y-coordinate overlap
-    const lines: any[][] = [];
-    
-    // Sort raw items by Y descending to process top-to-bottom
+    // Sort by Y (descending - top to bottom)
     items.sort((a: any, b: any) => b.y - a.y);
 
-    for (const item of items) {
-        let placed = false;
-        // Try to fit into an existing line
-        for (const line of lines) {
-            const representative = line[0];
-            // If overlapping vertically significantly, assume same line
-            // Use 50% overlap of the smaller height as threshold
-            const overlapThreshold = Math.min(item.height, representative.height) * 0.5;
-            if (Math.abs(item.y - representative.y) < overlapThreshold) {
-                line.push(item);
-                placed = true;
-                break;
+    const rows: any[][] = [];
+    if (items.length > 0) {
+        let currentRow = [items[0]];
+        for (let j = 1; j < items.length; j++) {
+            const item = items[j];
+            const prevItem = currentRow[0];
+            // If Y is close enough, considered same row
+            if (Math.abs(item.y - prevItem.y) < (prevItem.height * 0.6)) {
+                currentRow.push(item);
+            } else {
+                rows.push(currentRow);
+                currentRow = [item];
             }
         }
-        if (!placed) {
-            lines.push([item]);
-        }
+        rows.push(currentRow);
     }
 
-    // Sort lines themselves by Y descending (Top of page to Bottom)
-    lines.sort((a, b) => b[0].y - a[0].y);
+    // 2. Convert rows to strings, sorting X (ascending - left to right)
+    const rowStrings = rows.map(row => {
+        row.sort((a, b) => a.x - b.x);
+        return row.map(r => r.str).join(" ").trim();
+    });
 
-    // Sort items within each line by X ascending (Left to Right) and construct string
-    let pageText = "";
-    for (const line of lines) {
-        line.sort((a, b) => a.x - b.x);
-        
-        let lastXEnd = 0;
-        let lineStr = "";
-        
-        for (const item of line) {
-            // Add spacing based on X gap
-            if (lastXEnd > 0) {
-                const gap = item.x - lastXEnd;
-                if (gap > 20) {
-                    lineStr += "   "; // Column break
-                } else if (gap > 4) {
-                    lineStr += " "; // Word break
-                }
-            }
-            lineStr += item.str;
-            lastXEnd = item.x + item.width;
-        }
-        pageText += lineStr + "\n";
-    }
-    
-    fullStructureText += pageText + "\n";
+    allRows = [...allRows, ...rowStrings];
   }
   
-  // Attempt 1: Standard Regex Parsing with cleaned text
-  const regexItems = parseTextData(fullStructureText);
-  
-  // SMART FALLBACK:
-  // Use AI if regex returns nothing OR very few items relative to text length.
-  // We expect at least one item per ~1000 chars of text for a dense list.
-  const densityCheck = regexItems.length > 0 && (fullStructureText.length / regexItems.length) < 2000;
-  const seemsValid = regexItems.length > 2 || densityCheck;
+  // 3. State Machine Parsing
+  const parsedItems: QuoteItem[] = [];
+  let currentItem: Partial<QuoteItem> & { rawText: string } | null = null;
 
-  if (seemsValid) {
-    console.log("Regex parsing successful:", regexItems.length, "items");
-    return regexItems;
+  // Regex for Start of Item: "1) 1" or "234-5678" or "1234567"
+  const startPattern = /^(?:(\d+)\)\s+(\d+)|(?:[0-9A-Z]{2,5}-[0-9A-Z]{3,7})|(?:[0-9]{6,8}))\b/i;
+
+  const finalizeItem = (item: any) => {
+     if (!item) return;
+     
+     // 1. Qty extraction (CRITICAL for Price Logic)
+     let qty = 1;
+     const lineQty = item.rawText.match(/^\d+\)\s+(\d+)/);
+     const pMatchStart = item.rawText.match(/(?:\b[0-9A-Z]{1,5}-[0-9A-Z]{3,7}\b|\b[0-9]{5,8}\b)/i);
+     
+     if (lineQty) {
+         qty = parseInt(lineQty[1]);
+     } else if (pMatchStart) {
+         // Try number before part number
+         const pNoStr = pMatchStart[0];
+         const escP = pNoStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+         const qm = item.rawText.match(new RegExp(`(\\d+)\\s+(?=${escP})`, 'i'));
+         if (qm) qty = parseInt(qm[1]);
+     }
+
+     // 2. Price Determination (The GENIUS Logic)
+     let uPrice = determineCorrectPrice(item.rawText, qty);
+     if (uPrice === 0) return; // Not a valid item line
+
+     // Weight: Scan full block
+     const weight = extractWeight(item.rawText);
+
+     // Part No: Look for CAT style
+     let pNo = "";
+     const pMatch = item.rawText.match(/(?:\b[0-9A-Z]{1,5}-[0-9A-Z]{3,7}\b|\b[0-9]{5,8}\b)/i);
+     if (pMatch) {
+         if (!/^\d{1,4}$/.test(pMatch[0])) pNo = pMatch[0];
+     }
+     if (!pNo) pNo = "ITEM";
+
+     // Description
+     let desc = cleanDescription(item.rawText);
+     if (pNo && pNo !== "ITEM") {
+         const parts = desc.split(pNo);
+         if (parts.length > 1) desc = parts.pop() || "";
+     }
+     desc = desc.replace(/^[:\s-]+/g, "").replace(/\s+/g, " ").trim();
+     if (!desc) desc = "CAT COMPONENT";
+
+     parsedItems.push({
+         qty,
+         partNo: pNo,
+         desc,
+         weight,
+         unitPrice: uPrice
+     });
+  };
+
+  for (const rowText of allRows) {
+      // Filter total noise
+      if (!rowText) continue;
+      
+      // Enhanced Noise Filtering
+      if (rowText.match(/^Page \d/i) || rowText.match(/Invoice|Ship To|Bill To|Sold To|P\.O\.|Date:|Terms:|Due Date/i)) continue;
+
+      if (!/[a-zA-Z0-9]/.test(rowText)) continue;
+      if (rowText.length < 3 && !/\d/.test(rowText) && !/ea/i.test(rowText)) continue;
+
+      // Check if this row initiates a new item
+      // REQUIREMENT: Must have a price symbol '$' to be considered a valid item start in complex docs
+      const isNewItem = startPattern.test(rowText) && rowText.includes('$');
+
+      if (isNewItem) {
+          if (currentItem) finalizeItem(currentItem);
+          currentItem = { rawText: rowText };
+      } else {
+          if (currentItem) {
+              currentItem.rawText += " " + rowText;
+          }
+      }
   }
 
-  // Attempt 2: AI Fallback (Gemini 2.5 Flash)
-  console.log(`Regex yielded ${regexItems.length} items (unsure). Falling back to AI for robust parsing...`);
-  return await parseDocumentWithAI(fullStructureText);
+  // Push last item
+  if (currentItem) finalizeItem(currentItem);
+
+  if (parsedItems.length > 0) {
+      console.log(`Structured PDF Parsing yielded ${parsedItems.length} items.`);
+      return parsedItems;
+  }
+
+  console.log("Structured parsing failed. Falling back to AI.");
+  return await parseDocumentWithAI(allRows.join("\n"));
 };

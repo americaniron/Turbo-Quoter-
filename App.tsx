@@ -89,7 +89,26 @@ const App: React.FC = () => {
         const json = JSON.parse(e.target?.result as string);
         if (json.items) setItems(json.items);
         if (json.client) setClient(json.client);
-        if (json.config) setConfig(prev => ({ ...prev, ...json.config }));
+        
+        if (json.config) {
+            // Sanitize Config: Ensure markup is one of the valid positive options
+            const rawMarkup = json.config.markupPercentage;
+            const validMarkups = [10, 15, 20, 25, 30];
+            let safeMarkup = rawMarkup;
+            
+            // If strictly not in list or negative, default to 25
+            if (!validMarkups.includes(rawMarkup)) {
+                console.warn(`Invalid markup in file: ${rawMarkup}. Defaulting to 25%.`);
+                safeMarkup = 25;
+            }
+            
+            setConfig(prev => ({ 
+                ...prev, 
+                ...json.config,
+                markupPercentage: safeMarkup
+            }));
+        }
+        
         setCustomLogo(json.customLogo || null);
         setAiAnalysis(json.aiAnalysis || null);
         
@@ -131,10 +150,20 @@ const App: React.FC = () => {
       const draft = localStorage.getItem('american_iron_draft');
       if (draft) {
         const json = JSON.parse(draft);
-        // Correctly restore or reset values from draft
         setItems(json.items || []);
         setClient(json.client || { company: '', email: '', phone: '' });
-        setConfig(prev => ({ ...prev, ...json.config }));
+        
+        // Sanitize Config for Drafts too
+        const validMarkups = [10, 15, 20, 25, 30];
+        let safeMarkup = json.config?.markupPercentage || 25;
+        if (!validMarkups.includes(safeMarkup)) safeMarkup = 25;
+
+        setConfig(prev => ({ 
+            ...prev, 
+            ...json.config,
+            markupPercentage: safeMarkup
+        }));
+        
         setCustomLogo(json.customLogo || null);
         setAiAnalysis(json.aiAnalysis || null);
         

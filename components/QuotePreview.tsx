@@ -92,13 +92,37 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
         
         {/* Right Col: Engineering Insights (Formerly AI) */}
         {aiAnalysis && !config.isInvoice && (
-           <div className="break-inside-avoid flex flex-col h-full">
-            <div className="border-b-4 border-slate-600 bg-slate-100 px-3 py-2 font-bold uppercase text-[10px] text-slate-700 mb-3 print:border-b-2 flex items-center justify-between">
-                <span>Engineering Summary</span>
-                <svg className="w-3 h-3 text-slate-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg>
+           <div className="break-inside-avoid flex flex-col h-full shadow-lg rounded-lg overflow-hidden border border-slate-300 relative print:shadow-none print:border-slate-800">
+            {/* Header */}
+            <div className="bg-slate-900 px-4 py-3 flex items-center justify-between border-b-2 border-[#ffcd00] print:bg-slate-800">
+                 <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#ffcd00] animate-pulse print:hidden"></span>
+                    <span className="font-black uppercase text-[10px] text-white tracking-widest leading-none">
+                        System Diagnostic & Recommendations
+                    </span>
+                 </div>
+                 <svg className="w-4 h-4 text-[#ffcd00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
             </div>
-            <div className="flex-1 text-[10px] text-slate-700 leading-relaxed font-medium bg-slate-50 p-4 rounded-r border border-slate-200 border-l-4 border-l-[#ffcd00] italic text-justify">
-                "{aiAnalysis}"
+            
+            {/* Body */}
+            <div className="flex-1 bg-yellow-50 p-4 relative print:bg-white">
+                 {/* Decorative Watermark */}
+                 <div className="absolute -bottom-4 -right-4 p-4 opacity-[0.05] pointer-events-none print:hidden">
+                    <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" /></svg>
+                 </div>
+
+                 {/* Content */}
+                 <p className="text-[10px] text-slate-800 font-medium leading-relaxed font-mono text-justify relative z-10">
+                    "{aiAnalysis}"
+                 </p>
+
+                 {/* Call to Action Badge */}
+                 <div className="mt-4 flex items-center justify-between border-t border-yellow-200 pt-3">
+                     <div className="flex items-center gap-2">
+                        <span className="bg-[#ffcd00] text-black text-[8px] font-black px-2 py-1 uppercase rounded print:border print:border-black">Action Required</span>
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wide">Review Missing Components</span>
+                     </div>
+                 </div>
             </div>
           </div>
         )}

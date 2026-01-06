@@ -123,10 +123,11 @@ export const analyzeQuoteData = async (items: QuoteItem[]): Promise<string> => {
 
   try {
     const prompt = `Analyze this parts list for a heavy machinery repair job: ${JSON.stringify(items)}. 
-    1. Identify the likely repair system (e.g., Hydraulic System, Undercarriage, Engine Rebuild).
-    2. Note any critical missing components typically required for this job (e.g. 'Missing O-Ring Kit' or 'Check Fluid Levels').
-    3. Provide a professional, concise engineering summary (under 50 words).
-    Tone: Formal, Technical, Engineering Note. No AI self-reference.`;
+    1. Identify the repair system (e.g., Hydraulic, Undercarriage).
+    2. EXPLICITLY identify missing components that should be added to the order (e.g., 'Missing seals', 'Add Filter Kit').
+    3. Suggest one upsell item relevant to this repair.
+    4. Summarize as a "Diagnostic Report" for a customer.
+    Tone: Authoritative Engineering Advisor. Keep it under 60 words.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
