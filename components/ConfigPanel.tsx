@@ -50,6 +50,11 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   const [status, setStatus] = useState("Ready");
   const [draftSavedMsg, setDraftSavedMsg] = useState(false);
 
+  // Address Book State
+  const [savedClients, setSavedClients] = useState<ClientInfo[]>([]);
+  const [isAddressBookOpen, setIsAddressBookOpen] = useState(false);
+  const addressBookRef = useRef<HTMLDivElement>(null);
+
   // Draft Menu State
   const [isDraftMenuOpen, setIsDraftMenuOpen] = useState(false);
   const [draftOptions, setDraftOptions] = useState<DraftSaveOptions>({
@@ -59,11 +64,26 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   });
   const draftMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close draft menu when clicking outside
+  // Load saved clients on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('american_iron_clients');
+      if (stored) {
+        setSavedClients(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.warn("Failed to load address book", e);
+    }
+  }, []);
+
+  // Close menus when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (draftMenuRef.current && !draftMenuRef.current.contains(event.target as Node)) {
         setIsDraftMenuOpen(false);
+      }
+      if (addressBookRef.current && !addressBookRef.current.contains(event.target as Node)) {
+        setIsAddressBookOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -147,6 +167,48 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
 
   const toggleDraftOption = (key: keyof DraftSaveOptions) => {
       setDraftOptions(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // --- Address Book Functions ---
+  const saveClientToAddressBook = () => {
+    if (!client.company.trim()) {
+      alert("Please enter a Company Name to save.");
+      return;
+    }
+
+    const newEntry = { ...client };
+    
+    // Check for duplicates (by company name)
+    const exists = savedClients.some(c => c.company.toLowerCase() === newEntry.company.toLowerCase());
+    
+    let updatedList;
+    if (exists) {
+      if (!confirm(`Update existing contact for "${newEntry.company}"?`)) return;
+      updatedList = savedClients.map(c => c.company.toLowerCase() === newEntry.company.toLowerCase() ? newEntry : c);
+    } else {
+      updatedList = [...savedClients, newEntry];
+    }
+    
+    // Sort alphabetically
+    updatedList.sort((a, b) => a.company.localeCompare(b.company));
+
+    setSavedClients(updatedList);
+    localStorage.setItem('american_iron_clients', JSON.stringify(updatedList));
+  };
+
+  const loadClientFromAddressBook = (c: ClientInfo) => {
+    setClient(c);
+    onClientChange(c);
+    setIsAddressBookOpen(false);
+  };
+
+  const deleteClientFromAddressBook = (e: React.MouseEvent, index: number) => {
+    e.stopPropagation();
+    if (confirm("Remove this client from address book?")) {
+      const updatedList = savedClients.filter((_, i) => i !== index);
+      setSavedClients(updatedList);
+      localStorage.setItem('american_iron_clients', JSON.stringify(updatedList));
+    }
   };
 
   return (
@@ -416,9 +478,66 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         </div>
       </div>
 
-      {/* Client Info */}
-      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-8">
-        <div className="text-[9px] font-black uppercase text-black tracking-widest mb-4">Client Destination</div>
+      {/* Client Info with Address Book */}
+      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 mb-8 relative">
+        <div className="flex justify-between items-center mb-4">
+            <div className="text-[9px] font-black uppercase text-black tracking-widest">Client Destination</div>
+            <div className="flex gap-2 relative" ref={addressBookRef}>
+                 {/* Open Address Book Button */}
+                 <button 
+                    onClick={() => setIsAddressBookOpen(!isAddressBookOpen)}
+                    className="flex items-center gap-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors"
+                 >
+                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                     Address Book
+                     <span className="bg-slate-200 text-slate-600 px-1.5 rounded-md ml-1">{savedClients.length}</span>
+                 </button>
+
+                 {/* Save Contact Button */}
+                 <button 
+                    onClick={saveClientToAddressBook}
+                    className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors"
+                    title="Save current client to address book"
+                 >
+                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                     Save Contact
+                 </button>
+
+                 {/* Dropdown Menu */}
+                 {isAddressBookOpen && (
+                     <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-80 overflow-y-auto animate-in fade-in slide-in-from-top-2">
+                         <div className="p-3 border-b border-slate-100 sticky top-0 bg-white z-10">
+                             <div className="text-xs font-black uppercase text-slate-800 tracking-wide">Saved Clients</div>
+                         </div>
+                         {savedClients.length === 0 ? (
+                             <div className="p-6 text-center text-slate-400 text-xs italic">
+                                 No saved clients found.<br/>Fill details and click "Save Contact".
+                             </div>
+                         ) : (
+                             <div className="p-2 space-y-1">
+                                 {savedClients.map((c, idx) => (
+                                     <div key={idx} className="group flex items-start justify-between p-3 hover:bg-slate-50 rounded-lg cursor-pointer border border-transparent hover:border-slate-100 transition-all" onClick={() => loadClientFromAddressBook(c)}>
+                                         <div className="flex-1 min-w-0">
+                                             <div className="font-bold text-slate-800 text-xs truncate">{c.company}</div>
+                                             {c.email && <div className="text-[10px] text-slate-500 truncate">{c.email}</div>}
+                                             {c.phone && <div className="text-[10px] text-slate-400">{c.phone}</div>}
+                                         </div>
+                                         <button 
+                                            onClick={(e) => deleteClientFromAddressBook(e, idx)}
+                                            className="ml-2 text-slate-300 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                                            title="Remove client"
+                                         >
+                                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                         </button>
+                                     </div>
+                                 ))}
+                             </div>
+                         )}
+                     </div>
+                 )}
+            </div>
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <input type="text" placeholder="Company Name" value={client.company} onChange={(e) => updateClient('company', e.target.value)} className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-bold placeholder:text-slate-500 outline-none focus:border-yellow-400" />
           <input type="text" placeholder="Email Address" value={client.email} onChange={(e) => updateClient('email', e.target.value)} className="p-3 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white font-bold placeholder:text-slate-500 outline-none focus:border-yellow-400" />
