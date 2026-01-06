@@ -1,9 +1,11 @@
+
 export interface QuoteItem {
   qty: number;
   partNo: string;
   desc: string;
   weight: number; // Stored as number for calculations
   unitPrice: number;
+  originalImage?: string | null; // Base64 data of the original extracted image
 }
 
 export interface ClientInfo {

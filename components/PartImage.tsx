@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { generatePartImage } from '../services/geminiService.ts';
 
@@ -5,14 +6,21 @@ interface PartImageProps {
   partNo: string;
   description: string;
   enableAI: boolean;
+  originalImage?: string | null;
 }
 
-export const PartImage: React.FC<PartImageProps> = ({ partNo, description, enableAI }) => {
+export const PartImage: React.FC<PartImageProps> = ({ partNo, description, enableAI, originalImage }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [attempted, setAttempted] = useState(false);
 
+  // Effect for AI generation (Only runs if no original image)
   useEffect(() => {
+    if (originalImage) {
+        setImageUrl(originalImage);
+        return;
+    }
+
     if (enableAI && !attempted && !imageUrl) {
       const fetchImage = async () => {
         setLoading(true);
@@ -22,11 +30,10 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, enabl
         setAttempted(true);
       };
       
-      // Small stagger to prevent browser request flooding if many items
       const timer = setTimeout(fetchImage, Math.random() * 1000);
       return () => clearTimeout(timer);
     }
-  }, [enableAI, partNo, description, attempted, imageUrl]);
+  }, [enableAI, partNo, description, attempted, imageUrl, originalImage]);
 
   if (loading) {
     return (

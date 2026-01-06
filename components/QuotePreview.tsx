@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { QuoteItem, ClientInfo, AppConfig } from '../types.ts';
 import { PartImage } from './PartImage.tsx';
@@ -91,7 +92,12 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
                             <td className="py-6 pl-4 align-top">
                                 <div className="flex items-start gap-4">
                                     <div className="w-20 h-20 flex-shrink-0 bg-white border border-gray-100 flex items-center justify-center p-1">
-                                         <PartImage partNo={item.partNo} description={item.desc} enableAI={aiEnabled} />
+                                         <PartImage 
+                                            partNo={item.partNo} 
+                                            description={item.desc} 
+                                            enableAI={aiEnabled} 
+                                            originalImage={item.originalImage}
+                                         />
                                     </div>
                                     <div className="pt-1">
                                         <div className="font-bold text-gray-800 leading-tight">

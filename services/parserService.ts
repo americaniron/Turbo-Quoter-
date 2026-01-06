@@ -1,3 +1,4 @@
+
 import { QuoteItem } from '../types.ts';
 import { parseDocumentWithAI } from './geminiService.ts';
 
@@ -134,6 +135,18 @@ function determineCorrectPrice(text: string, qty: number): number {
     }
 
     return prices[0];
+}
+
+// --- Matrix Helper for PDF Transformations ---
+function multiplyMatrix(m1: number[], m2: number[]): number[] {
+    return [
+        m1[0] * m2[0] + m1[2] * m2[1],
+        m1[1] * m2[0] + m1[3] * m2[1],
+        m1[0] * m2[2] + m1[2] * m2[3],
+        m1[1] * m2[2] + m1[3] * m2[3],
+        m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+        m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
+    ];
 }
 
 // --- Main Parsers ---
@@ -413,21 +426,86 @@ export const parseExcelFile = async (file: File): Promise<QuoteItem[]> => {
 
 /**
  * Refactored PDF Parser using Visual Rows and a State Machine.
- * Handles multi-line descriptions and complex layouts better.
- * Includes aggressive filtering for stray characters and varying densities.
+ * NOW INCLUDES IMAGE EXTRACTION
  */
 export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   
-  // Storage for all visual lines across all pages
-  let allRows: string[] = [];
+  // Storage for all visual lines with potential linked images
+  let allRowObjects: { text: string, images: string[] }[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
+    
+    // --- 1. EXTRACT IMAGES ---
+    const pageImages: { y: number, base64: string }[] = [];
+    try {
+        const ops = await page.getOperatorList();
+        const commonObjs = page.commonObjs; // Or page.objs in some versions
+        const objs = page.objs;
+        
+        let currentMatrix = [1, 0, 0, 1, 0, 0];
+        const matrixStack: number[][] = [];
+
+        for (let j = 0; j < ops.fnArray.length; j++) {
+            const fn = ops.fnArray[j];
+            const args = ops.argsArray[j];
+
+            if (fn === window.pdfjsLib.OPS.save) {
+                matrixStack.push([...currentMatrix]);
+            } else if (fn === window.pdfjsLib.OPS.restore) {
+                if (matrixStack.length > 0) currentMatrix = matrixStack.pop()!;
+            } else if (fn === window.pdfjsLib.OPS.transform) {
+                currentMatrix = multiplyMatrix(currentMatrix, args);
+            } else if (fn === window.pdfjsLib.OPS.paintImageXObject) {
+                const imgName = args[0];
+                try {
+                    // Try getting the object (Async in newer versions)
+                    let imgObj = null;
+                    try { imgObj = await objs.get(imgName); } catch (e) { /* ignore */ }
+                    if (!imgObj && commonObjs) {
+                        try { imgObj = await commonObjs.get(imgName); } catch (e) { /* ignore */ }
+                    }
+
+                    if (imgObj && (imgObj.data || imgObj.bitmap)) {
+                        // Create temporary canvas to convert to base64
+                        const canvas = document.createElement('canvas');
+                        canvas.width = imgObj.width;
+                        canvas.height = imgObj.height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        if (imgObj.bitmap) {
+                             ctx?.drawImage(imgObj.bitmap, 0, 0);
+                        } else if (imgObj.data) {
+                             // Raw RGBA or similar data
+                             // This is complex as it depends on colorspace, but often it's RGBA in PDF.js post-processing
+                             // Simple fallback for common RGB/RGBA
+                             const array = new Uint8ClampedArray(imgObj.data);
+                             const imgData = new ImageData(array, imgObj.width, imgObj.height);
+                             ctx?.putImageData(imgData, 0, 0);
+                        }
+                        
+                        // Check if canvas is valid (not empty)
+                        if (canvas.width > 0 && canvas.height > 0) {
+                            pageImages.push({
+                                y: currentMatrix[5], // ty translation is the Y coordinate
+                                base64: canvas.toDataURL('image/jpeg', 0.8)
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Image extraction warning:", err);
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Failed to extract images from page " + i, e);
+    }
+    
+    // --- 2. EXTRACT TEXT ---
     const content = await page.getTextContent();
     
-    // 1. Group items by Y-coordinate (Visual Rows)
     const items = content.items
       .map((item: any) => ({
         str: item.str,
@@ -458,20 +536,29 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
         rows.push(currentRow);
     }
 
-    // 2. Convert rows to strings, sorting X (ascending - left to right)
-    const rowStrings = rows.map(row => {
+    // --- 3. MERGE TEXT AND IMAGES ---
+    const pageRows = rows.map(row => {
         row.sort((a, b) => a.x - b.x);
-        return row.map(r => r.str).join(" ").trim();
+        const text = row.map(r => r.str).join(" ").trim();
+        const rowY = row[0].y; // Approximate Y for the whole row
+        
+        // Find images that are vertically close to this row
+        // Images are often slightly offset, so we use a tolerance (e.g., +/- 30 units)
+        const linkedImages = pageImages
+            .filter(img => Math.abs(img.y - rowY) < 50)
+            .map(img => img.base64);
+
+        return { text, images: linkedImages };
     });
 
-    allRows = [...allRows, ...rowStrings];
+    allRowObjects = [...allRowObjects, ...pageRows];
   }
   
   // 3. State Machine Parsing
   const parsedItems: QuoteItem[] = [];
-  let currentItem: Partial<QuoteItem> & { rawText: string } | null = null;
+  let currentItem: Partial<QuoteItem> & { rawText: string, attachedImages: string[] } | null = null;
 
-  // Regex for Start of Item: "1) 1" or "234-5678" or "1234567"
+  // Regex for Start of Item
   const startPattern = /^(?:(\d+)\)\s+(\d+)|(?:[0-9A-Z]{2,5}-[0-9A-Z]{3,7})|(?:[0-9]{6,8}))\b/i;
 
   const finalizeItem = (item: any) => {
@@ -485,21 +572,20 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
      if (lineQty) {
          qty = parseInt(lineQty[1]);
      } else if (pMatchStart) {
-         // Try number before part number
          const pNoStr = pMatchStart[0];
          const escP = pNoStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
          const qm = item.rawText.match(new RegExp(`(\\d+)\\s+(?=${escP})`, 'i'));
          if (qm) qty = parseInt(qm[1]);
      }
 
-     // 2. Price Determination (The GENIUS Logic)
+     // 2. Price Determination
      let uPrice = determineCorrectPrice(item.rawText, qty);
-     if (uPrice === 0) return; // Not a valid item line
+     if (uPrice === 0) return; 
 
-     // Weight: Scan full block
+     // Weight
      const weight = extractWeight(item.rawText);
 
-     // Part No: Look for CAT style
+     // Part No
      let pNo = "";
      const pMatch = item.rawText.match(/(?:\b[0-9A-Z]{1,5}-[0-9A-Z]{3,7}\b|\b[0-9]{5,8}\b)/i);
      if (pMatch) {
@@ -509,61 +595,58 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
 
      // Description
      let desc = cleanDescription(item.rawText);
-     // Only split if partNo exists and is distinct from the item label
      if (pNo && pNo !== "ITEM" && desc.includes(pNo)) {
          const parts = desc.split(pNo);
          if (parts.length > 1) desc = parts.slice(1).join(" ");
      }
      desc = desc.replace(/^[:\s-]+/g, "").replace(/\s+/g, " ").trim();
      if (!desc) desc = "CAT COMPONENT";
+     
+     // Images
+     const originalImage = item.attachedImages && item.attachedImages.length > 0 ? item.attachedImages[0] : null;
 
      parsedItems.push({
          qty,
          partNo: pNo,
          desc,
          weight,
-         unitPrice: uPrice
+         unitPrice: uPrice,
+         originalImage
      });
   };
 
-  for (const rowText of allRows) {
-      // Filter total noise
+  for (const rowObj of allRowObjects) {
+      const rowText = rowObj.text;
+      
       if (!rowText) continue;
-      
-      // Enhanced Noise Filtering, but PERMISSIVE for continuation lines
       if (rowText.match(/^Page \d/i) || rowText.match(/Invoice|Ship To|Bill To|Sold To|P\.O\.|Date:|Terms:|Due Date/i)) continue;
-      
-      // Stop scanning if we hit the Totals section
       if (rowText.match(/Subtotal|Total Tax|Total Amount|Balance Due/i)) break;
 
-      // Check if this row initiates a new item
-      // REQUIREMENT: Must have a price symbol '$' to be considered a valid item start in complex docs
       const isNewItem = startPattern.test(rowText) && rowText.includes('$');
 
       if (isNewItem) {
           if (currentItem) finalizeItem(currentItem);
-          currentItem = { rawText: rowText };
+          currentItem = { rawText: rowText, attachedImages: rowObj.images };
       } else {
-          // INCLUSIVE DESCRIPTION LOGIC:
-          // If we have an active item, assume this line is a continuation of the description
-          // (e.g. "Includes Seals", "Dim: 5x5") unless it looks like a page footer.
           if (currentItem) {
-              // Only filter really garbage characters if appending
               if (/[a-zA-Z0-9]/.test(rowText)) {
                   currentItem.rawText += " " + rowText;
+                  // If subsequent lines have images (unlikely in this format but possible), accumulate them
+                  if (rowObj.images.length > 0) {
+                      currentItem.attachedImages = [...currentItem.attachedImages, ...rowObj.images];
+                  }
               }
           }
       }
   }
 
-  // Push last item
   if (currentItem) finalizeItem(currentItem);
 
   if (parsedItems.length > 0) {
-      console.log(`Structured PDF Parsing yielded ${parsedItems.length} items.`);
+      console.log(`Structured PDF Parsing yielded ${parsedItems.length} items with images.`);
       return parsedItems;
   }
 
   console.log("Structured parsing failed. Falling back to AI.");
-  return await parseDocumentWithAI(allRows.join("\n"));
+  return await parseDocumentWithAI(allRowObjects.map(r => r.text).join("\n"));
 };
