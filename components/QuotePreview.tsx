@@ -66,14 +66,13 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
       {/* Main List Section */}
       <div className="mb-8">
         <h2 className="text-xl font-bold text-gray-800 mb-2">Items In Your Order</h2>
-        <div className="w-full border-t border-gray-300"></div>
+        <div className="w-full border-t border-gray-300 mb-6"></div>
         
-        <table className="w-full text-left border-collapse">
+        <table className="w-full text-left border-collapse table-fixed">
             <thead>
                 <tr className="border-b border-gray-300 text-[13px] font-bold text-gray-600 h-10">
-                    <th className="py-2 w-10 text-center"></th> {/* Line # */}
                     <th className="py-2 w-16 text-center">Quantity</th>
-                    <th className="py-2 pl-4">Product Description</th>
+                    <th className="py-2 w-auto pl-2">Product Description</th>
                     <th className="py-2 w-24">Notes</th>
                     <th className="py-2 w-32">Availability</th>
                     <th className="py-2 w-32 text-right">Total Price (USD)</th>
@@ -87,35 +86,36 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
 
                     return (
                         <tr key={idx} className="border-b border-gray-200 text-[13px] group break-inside-avoid">
-                            <td className="py-6 text-gray-500 font-medium align-top text-center">{idx + 1})</td>
-                            <td className="py-6 text-gray-900 font-medium align-top text-center">{item.qty}</td>
-                            <td className="py-6 pl-4 align-top">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-20 h-20 flex-shrink-0 bg-white border border-gray-100 flex items-center justify-center p-1">
+                            <td className="py-6 text-gray-900 font-bold align-top text-center">{item.qty}</td>
+                            <td className="py-6 pl-2 align-top">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-16 h-16 flex-shrink-0 bg-white border border-gray-100 flex items-center justify-center p-0.5">
                                          <PartImage 
                                             partNo={item.partNo} 
                                             description={item.desc} 
                                             enableAI={aiEnabled} 
-                                            originalImage={item.originalImage}
+                                            originalImages={item.originalImages}
                                          />
                                     </div>
-                                    <div className="pt-1">
+                                    <div className="pt-0.5 min-w-0">
                                         <div className="font-bold text-gray-800 leading-tight">
                                             {item.partNo}: {item.desc}
                                         </div>
-                                        <div className="text-gray-500 mt-1">
+                                        <div className="text-gray-500 mt-1 text-xs">
                                             {displayWeight} {unitLabel}
                                         </div>
                                     </div>
                                 </div>
                             </td>
-                            <td className="py-6 text-gray-500 align-top pt-7">
-                                {/* Notes empty */}
+                            <td className="py-6 text-gray-500 align-top pt-6 italic text-xs">
+                                {/* Notes Placeholder - can be mapped if extracted */}
                             </td>
-                            <td className="py-6 text-gray-800 align-top pt-7">
-                                <span className="text-green-600 font-bold">{item.qty}</span> in stock
+                            <td className="py-6 align-top pt-6">
+                                <span className="text-gray-800 font-medium block">
+                                    {item.availability || 'Check Availability'}
+                                </span>
                             </td>
-                            <td className="py-6 text-right align-top pt-7">
+                            <td className="py-6 text-right align-top pt-6">
                                 <div className="font-bold text-gray-900 text-sm">
                                     ${lineTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                 </div>

@@ -6,22 +6,23 @@ interface PartImageProps {
   partNo: string;
   description: string;
   enableAI: boolean;
-  originalImage?: string | null;
+  originalImages?: string[]; // Updated to accept array
 }
 
-export const PartImage: React.FC<PartImageProps> = ({ partNo, description, enableAI, originalImage }) => {
+export const PartImage: React.FC<PartImageProps> = ({ partNo, description, enableAI, originalImages }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [attempted, setAttempted] = useState(false);
 
-  // Effect for AI generation (Only runs if no original image)
+  // Check for original images from PDF first
   useEffect(() => {
-    if (originalImage) {
-        setImageUrl(originalImage);
+    if (originalImages && originalImages.length > 0) {
+        setImageUrl(originalImages[0]);
         return;
     }
-
-    if (enableAI && !attempted && !imageUrl) {
+    
+    // Fallback to AI if enabled and no original image
+    if (enableAI && !attempted && !imageUrl && (!originalImages || originalImages.length === 0)) {
       const fetchImage = async () => {
         setLoading(true);
         const url = await generatePartImage(partNo, description);
@@ -33,7 +34,7 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, enabl
       const timer = setTimeout(fetchImage, Math.random() * 1000);
       return () => clearTimeout(timer);
     }
-  }, [enableAI, partNo, description, attempted, imageUrl, originalImage]);
+  }, [enableAI, partNo, description, attempted, imageUrl, originalImages]);
 
   if (loading) {
     return (
@@ -45,7 +46,7 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, enabl
 
   if (imageUrl) {
     return (
-      <div className="w-full h-full bg-white flex items-center justify-center">
+      <div className="w-full h-full bg-white flex items-center justify-center overflow-hidden">
         <img src={imageUrl} alt={partNo} className="max-w-full max-h-full object-contain" />
       </div>
     );

@@ -5,7 +5,8 @@ export interface QuoteItem {
   desc: string;
   weight: number; // Stored as number for calculations
   unitPrice: number;
-  originalImage?: string | null; // Base64 data of the original extracted image
+  originalImages?: string[]; // Base64 data of extracted images
+  availability?: string; // Extracted availability text (e.g., "All 1 by Jan 08")
 }
 
 export interface ClientInfo {

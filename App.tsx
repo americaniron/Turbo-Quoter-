@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
@@ -87,7 +88,16 @@ const App: React.FC = () => {
     reader.onload = (e) => {
       try {
         const json = JSON.parse(e.target?.result as string);
-        if (json.items) setItems(json.items);
+        
+        if (json.items) {
+            // Migration: Convert single originalImage to array if needed
+            const migratedItems = json.items.map((item: any) => ({
+                ...item,
+                originalImages: item.originalImages || (item.originalImage ? [item.originalImage] : [])
+            }));
+            setItems(migratedItems);
+        }
+
         if (json.client) setClient(json.client);
         
         if (json.config) {
@@ -167,7 +177,13 @@ const App: React.FC = () => {
         const json = JSON.parse(draft);
         
         // We only restore what is present in the draft
-        if (json.items) setItems(json.items);
+        if (json.items) {
+             const migratedItems = json.items.map((item: any) => ({
+                ...item,
+                originalImages: item.originalImages || (item.originalImage ? [item.originalImage] : [])
+            }));
+            setItems(migratedItems);
+        }
         if (json.client) setClient(json.client);
         
         // Sanitize Config for Drafts too
