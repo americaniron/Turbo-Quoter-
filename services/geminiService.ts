@@ -1,25 +1,26 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { QuoteItem } from "../types.ts";
+import { QuoteItem, ClientInfo, AppConfig, EmailDraft } from "../types.ts";
 
 /**
  * AI Brainstorming/Analysis using Gemini 3 Pro for complex reasoning.
- * Optimized prompt for engineering logic.
  */
 export const analyzeQuoteData = async (items: QuoteItem[]): Promise<string> => {
-  // Always create a new instance right before the call to ensure the latest API Key
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  
   if (!process.env.API_KEY) return "Configuration Error: Missing API Credentials";
 
   try {
-    const context = items.map(i => `${i.qty}x ${i.partNo} (${i.desc})`).join(", ");
+    // Including line numbers in context so AI can reference them
+    const context = items.map((i, idx) => `Line ${(idx + 1).toString().padStart(2, '0')}: ${i.qty}x ${i.partNo} (${i.desc})`).join("\n");
+    
     const prompt = `
         You are a senior heavy machinery logistics engineer at American Iron.
-        Analyze this machinery parts list: ${context}.
+        Analyze this machinery parts list:
+        ${context}
+        
         TASK:
-        1. Identify the primary machine system being repaired.
-        2. Identify any CRITICAL MISSING COMPONENTS (e.g. if filters are ordered but seals are missing).
+        1. Identify the primary machine system being repaired (e.g. Engine, Undercarriage, Hydraulic).
+        2. Identify any CRITICAL MISSING COMPONENTS (e.g. if filters are ordered but seals or gaskets are missing). Refer to items by their Line Number.
         3. Provide 1 proactive maintenance recommendation.
         
         OUTPUT: Provide a cohesive, authoritative 2-3 sentence engineering brief. 
@@ -30,8 +31,6 @@ export const analyzeQuoteData = async (items: QuoteItem[]): Promise<string> => {
       model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
-        // Gemini 3 Pro is a reasoning-first model. Setting a thinkingBudget of 0 is invalid.
-        // We provide a reasonable budget (1024 tokens) to allow for technical synthesis.
         thinkingConfig: { thinkingBudget: 1024 }
       }
     });
@@ -39,10 +38,64 @@ export const analyzeQuoteData = async (items: QuoteItem[]): Promise<string> => {
     return response.text || "Diagnostic analysis yielded no specific concerns.";
   } catch (error) {
     console.error("Analysis Error:", error);
-    if (error.message?.includes("entity was not found")) {
-        return "Requested entity was not found. Please verify your project billing and key selection.";
-    }
-    return "The engineering hub is currently offline. Please check your network connection.";
+    return "The engineering hub is currently offline.";
+  }
+};
+
+/**
+ * Generates an AI-synthesized email draft for the customer.
+ */
+export const generateEmailDraft = async (
+  client: ClientInfo, 
+  config: AppConfig, 
+  items: QuoteItem[],
+  tone: string = "professional"
+): Promise<EmailDraft> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const type = config.isInvoice ? "Invoice" : "Quotation";
+  
+  // Provide item details with line numbers to help AI write better context
+  const itemsContext = items.map((i, idx) => `${(idx + 1).toString().padStart(2, '0')}. ${i.qty}x ${i.partNo}`).join(", ");
+
+  const prompt = `
+    You are an automated logistics dispatch agent for American Iron LLC (americaniron1.com).
+    Generate a ${tone} email body for:
+    - Customer: ${client.contactName} at ${client.company}
+    - Document: ${type} #${config.quoteId}
+    - Line Items [${items.length}]: ${itemsContext.substring(0, 500)}
+    - Context: Parts ready for dispatch/review.
+    
+    The email must mention that the ${type} is attached and they can contact us at americaniron1.com for any discrepancies.
+    Include a clear call to action.
+    Return only a JSON object matching this schema:
+    { "to": "${client.email}", "subject": "American Iron Hub: ${type} ${config.quoteId} Dispatch Notice", "body": "..." }
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            to: { type: Type.STRING },
+            subject: { type: Type.STRING },
+            body: { type: Type.STRING }
+          },
+          required: ["to", "subject", "body"]
+        }
+      }
+    });
+    
+    return JSON.parse(response.text || "{}") as EmailDraft;
+  } catch (error) {
+    return {
+      to: client.email,
+      subject: `American Iron: ${type} ${config.quoteId}`,
+      body: `Hello ${client.contactName},\n\nPlease find the attached ${type} for your review.\n\nRegards,\nAmerican Iron Team`
+    };
   }
 };
 
@@ -69,7 +122,6 @@ export const generatePartImage = async (partNo: string, description: string): Pr
     const b64 = response.generatedImages?.[0]?.image?.imageBytes;
     return b64 ? `data:image/jpeg;base64,${b64}` : null;
   } catch (error) {
-    // Fallback to Gemini 3 Pro Image generation if Imagen fails
     try {
         const genResponse = await ai.models.generateContent({
           model: 'gemini-3-pro-image-preview',
@@ -81,41 +133,5 @@ export const generatePartImage = async (partNo: string, description: string): Pr
         }
     } catch (e) {}
     return null;
-  }
-};
-
-/**
- * Parses unstructured text into structured QuoteItems using Gemini 3 Flash.
- */
-export const parseDocumentWithAI = async (text: string): Promise<QuoteItem[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  if (!process.env.API_KEY) return [];
-
-  try {
-    const prompt = `Extract tabular line item data from: """${text.substring(0, 15000)}"""`;
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-             type: Type.OBJECT,
-             properties: {
-                qty: { type: Type.NUMBER },
-                partNo: { type: Type.STRING },
-                desc: { type: Type.STRING },
-                weight: { type: Type.NUMBER },
-                unitPrice: { type: Type.NUMBER }
-             }
-          }
-        }
-      }
-    });
-    const parsed = JSON.parse(response.text || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
   }
 };

@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
+import { EmailModule } from './components/EmailModule.tsx';
 import { Login } from './components/Login.tsx';
 import { QuoteItem, ClientInfo, AppConfig, SavedClient, User } from './types.ts';
 import { analyzeQuoteData } from './services/geminiService.ts';
@@ -62,6 +63,7 @@ const App: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
+  const [isEmailOpen, setIsEmailOpen] = useState(false);
   
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -151,7 +153,7 @@ const App: React.FC = () => {
     }
 
     try {
-        const data = { version: '1.6', author: user?.username, timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
+        const data = { version: '1.7', author: user?.username, timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
         const json = JSON.stringify(data, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -168,6 +170,13 @@ const App: React.FC = () => {
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }, 100);
+
+        // Prompt for email after save
+        if (client.email) {
+          if (confirm("Document exported successfully. Commence AI Dispatch Protocol to " + client.email + "?")) {
+            setIsEmailOpen(true);
+          }
+        }
     } catch (err: any) {
         alert("Export Error: " + err.message);
     }
@@ -242,6 +251,7 @@ const App: React.FC = () => {
         onLoadQuote={handleLoadQuote}
         onSaveDraft={handleSaveDraft}
         onResumeDraft={handleResumeDraft}
+        onEmailDispatch={() => setIsEmailOpen(true)}
         hasDraft={hasDraft}
         aiEnabled={aiEnabled}
         isAnalyzing={isAnalyzing}
@@ -267,6 +277,14 @@ const App: React.FC = () => {
             customLogo={customLogo}
         />
       </div>
+
+      <EmailModule 
+        isOpen={isEmailOpen} 
+        onClose={() => setIsEmailOpen(false)} 
+        client={client} 
+        config={config} 
+        items={items} 
+      />
     </div>
   );
 };

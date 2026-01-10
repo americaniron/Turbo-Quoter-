@@ -9,10 +9,10 @@ export interface QuoteItem {
   qty: number;
   partNo: string;
   desc: string;
-  weight: number; // Stored as number for calculations
+  weight: number; 
   unitPrice: number;
-  originalImages?: string[]; // Base64 data of extracted images
-  availability?: string; // Extracted availability text
+  originalImages?: string[]; 
+  availability?: string; 
 }
 
 export interface ClientInfo {
@@ -36,11 +36,11 @@ export interface AppConfig {
   discountPercentage: number;
   quoteId: string;
   poNumber: string;
-  expirationDate: string; // YYYY-MM-DD format
+  expirationDate: string; 
   logisticsRate: number;
   isInvoice: boolean;
   weightUnit: 'LBS' | 'KG';
-  includeAiAnalysis: boolean; // New toggle for AI Brainstorming visibility
+  includeAiAnalysis: boolean; 
   paymentTerms?: string;
   specialInstructions?: string;
   shippingCompany?: string;
@@ -50,6 +50,12 @@ export interface AppConfig {
   shippingState?: string;
   shippingZip?: string;
   shippingCountry?: string;
+}
+
+export interface EmailDraft {
+  to: string;
+  subject: string;
+  body: string;
 }
 
 export enum ParseMode {

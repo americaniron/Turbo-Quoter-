@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AppConfig, ClientInfo, ParseMode, QuoteItem, SavedClient, User } from '../types.ts';
 import { parseTextData, parsePdfFile, parseExcelFile } from '../services/parserService.ts';
 import { Logo } from './Logo.tsx';
@@ -15,6 +15,7 @@ interface ConfigPanelProps {
   onLoadQuote: (file: File) => void;
   onSaveDraft: (options: any) => void;
   onResumeDraft: () => void;
+  onEmailDispatch: () => void;
   hasDraft: boolean;
   aiEnabled: boolean;
   isAnalyzing: boolean;
@@ -48,7 +49,7 @@ const FieldGroup: React.FC<{ label: string; children: React.ReactNode; className
 
 export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   itemsCount, onDataLoaded, onConfigChange, onClientChange, onAiToggle, onAnalyze, onSaveQuote, 
-  onLoadQuote, onSaveDraft, onResumeDraft, hasDraft, aiEnabled, isAnalyzing, 
+  onLoadQuote, onSaveDraft, onResumeDraft, onEmailDispatch, hasDraft, aiEnabled, isAnalyzing, 
   config, client, customLogo, onLogoUpload, onRefreshId,
   addressBook, onSaveToBook, onDeleteFromBook, currentUser, onLogout
 }) => {
@@ -58,6 +59,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   const [showShipping, setShowShipping] = useState(false);
   const [showAddressBook, setShowAddressBook] = useState(false);
   const [bookSearch, setBookSearch] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleProcess = async () => {
     setStatus("Processing...");
@@ -99,6 +101,18 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
     let newId = config.quoteId;
     newId = isInv ? newId.replace('-QT-', '-INV-') : newId.replace('-INV-', '-QT-');
     onConfigChange({ ...config, isInvoice: isInv, quoteId: newId });
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string;
+        onLogoUpload(base64);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const markupOptions = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 75, 100];
@@ -196,17 +210,19 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
             <div className="bg-slate-50 p-6 rounded-[2rem] border-2 border-slate-100 shadow-inner group-hover:border-indigo-400 transition-all duration-300">
                 {customLogo ? <img src={customLogo} alt="Logo" className="h-24 w-auto object-contain" /> : <Logo className="h-24 w-auto object-contain" />}
             </div>
-            <label className="absolute -bottom-4 -right-4 bg-slate-900 text-white text-[9px] font-black uppercase px-5 py-2.5 rounded-2xl cursor-pointer shadow-2xl hover:bg-indigo-600 transition-all border-4 border-white">
-                REFRESH LOGO
-                <input type="file" className="hidden" accept="image/*" onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const r = new FileReader();
-                    r.onload = (ev) => onLogoUpload(ev.target?.result as string);
-                    r.readAsDataURL(file);
-                  }
-                }} />
-            </label>
+            <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute -bottom-4 -right-4 bg-slate-900 text-white text-[9px] font-black uppercase px-5 py-2.5 rounded-2xl cursor-pointer shadow-2xl hover:bg-indigo-600 transition-all border-4 border-white active:scale-95"
+            >
+                UPLOAD LOGO
+            </button>
+            <input 
+                type="file" 
+                ref={fileInputRef}
+                className="hidden" 
+                accept="image/*" 
+                onChange={handleLogoUpload} 
+            />
           </div>
           <div className="space-y-2">
             <h2 className="text-4xl font-black uppercase italic tracking-tighter text-slate-900 leading-tight">Iron Logistics <span className="text-indigo-600 font-normal tracking-normal text-lg bg-indigo-50 px-3 py-1 rounded-full">{currentUser.displayName}</span></h2>
@@ -396,7 +412,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-16">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-6 mb-16">
         <FieldGroup label="Pricing Markup" isDark>
             <select value={config.markupPercentage} onChange={(e) => updateConfig('markupPercentage', parseInt(e.target.value))} className="w-full p-5 bg-slate-900 text-[#ffcd00] text-[14px] font-black rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none appearance-none cursor-pointer">
                 {markupOptions.map(opt => <option key={opt} value={opt}>{opt}% MARGIN</option>)}
@@ -408,34 +424,54 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
             </select>
         </FieldGroup>
         <FieldGroup label="Metrics" isDark>
-            <div className="flex bg-slate-900 p-2 rounded-[1.5rem] border-2 border-slate-800">
+            <div className="flex bg-slate-900 p-2 rounded-[1.5rem] border-2 border-slate-800 h-full">
                 <button onClick={() => updateConfig('weightUnit', 'LBS')} className={`flex-1 py-3 text-[11px] font-black rounded-xl transition-all ${config.weightUnit === 'LBS' ? 'bg-[#ffcd00] text-black shadow-lg' : 'text-slate-500 hover:text-white'}`}>LBS</button>
                 <button onClick={() => updateConfig('weightUnit', 'KG')} className={`flex-1 py-3 text-[11px] font-black rounded-xl transition-all ${config.weightUnit === 'KG' ? 'bg-[#ffcd00] text-black shadow-lg' : 'text-slate-500 hover:text-white'}`}>KG</button>
             </div>
         </FieldGroup>
-        <FieldGroup label="Record Identifier" className="col-span-2 md:col-span-1" isDark>
+        <FieldGroup label="Record ID" isDark>
             <div className="relative">
-                <input type="text" value={config.quoteId} onChange={(e) => updateConfig('quoteId', e.target.value)} className="w-full p-5 bg-slate-900 text-white text-[12px] font-mono font-bold rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none pr-12" />
-                {onRefreshId && <button onClick={onRefreshId} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-[#ffcd00] transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></button>}
+                <input type="text" value={config.quoteId} onChange={(e) => updateConfig('quoteId', e.target.value)} className="w-full p-5 bg-slate-900 text-white text-[12px] font-mono font-bold rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none pr-10" />
+                {onRefreshId && <button onClick={onRefreshId} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-[#ffcd00] transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></button>}
             </div>
         </FieldGroup>
         <FieldGroup label="P.O. REF" isDark>
             <input type="text" value={config.poNumber} onChange={(e) => updateConfig('poNumber', e.target.value)} className="w-full p-5 bg-slate-900 text-white text-[12px] font-mono font-bold rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none" placeholder="---" />
         </FieldGroup>
-        <FieldGroup label="IMAGE GENERATION" isDark>
+        <FieldGroup label="Logistics Rate" isDark>
+            <div className="relative">
+              <input 
+                type="number" 
+                step="0.01"
+                value={config.logisticsRate} 
+                onChange={(e) => updateConfig('logisticsRate', parseFloat(e.target.value) || 0)} 
+                className="w-full p-5 bg-slate-900 text-[#ffcd00] text-[14px] font-black rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none pr-10" 
+                placeholder="0.00"
+              />
+            </div>
+        </FieldGroup>
+        <FieldGroup label="AI Images" isDark>
             <button 
               onClick={() => onAiToggle(!aiEnabled)}
-              className={`w-full p-5 rounded-[1.5rem] border-2 font-black text-[12px] tracking-widest transition-all ${aiEnabled ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-900 border-slate-800 text-slate-500'}`}
+              className={`w-full h-full p-5 rounded-[1.5rem] border-2 font-black text-[10px] tracking-tight transition-all active:scale-95 ${aiEnabled ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-slate-900 border-slate-800 text-slate-500'}`}
             >
-              {aiEnabled ? 'ENGAGED' : 'DISABLED'}
+              {aiEnabled ? 'ACTIVE' : 'OFF'}
             </button>
         </FieldGroup>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 items-center bg-slate-50/50 p-8 rounded-[3rem] border-2 border-slate-100">
-        <button onClick={onAnalyze} disabled={isAnalyzing} className="md:col-span-3 bg-slate-950 text-white font-black text-sm py-8 rounded-[2.5rem] uppercase tracking-[0.3em] flex items-center justify-center gap-5 transition-all hover:bg-indigo-600 hover:-translate-y-1 active:scale-95 shadow-2xl">
+        <button onClick={onAnalyze} disabled={isAnalyzing} className="md:col-span-2 bg-slate-950 text-white font-black text-sm py-8 rounded-[2.5rem] uppercase tracking-[0.3em] flex items-center justify-center gap-5 transition-all hover:bg-indigo-600 hover:-translate-y-1 active:scale-95 shadow-2xl">
             {isAnalyzing ? <div className="w-6 h-6 border-4 border-slate-400 border-t-white rounded-full animate-spin"></div> : <svg className="w-7 h-7 text-[#ffcd00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>}
             Technical Analysis Engine
+        </button>
+        <button 
+          onClick={onEmailDispatch}
+          disabled={itemsCount === 0 || !client.email}
+          className={`bg-indigo-600 text-white font-black text-sm py-8 rounded-[2.5rem] uppercase tracking-[0.3em] flex items-center justify-center gap-5 transition-all hover:bg-white hover:text-indigo-600 border-4 border-transparent hover:border-indigo-600 hover:-translate-y-1 active:scale-95 shadow-2xl ${itemsCount === 0 || !client.email ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+        >
+          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          Dispatch Protocol
         </button>
       </div>
 
