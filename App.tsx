@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
@@ -58,6 +57,7 @@ const App: React.FC = () => {
     shippingCountry: 'United States'
   });
   
+  // Default AI images to FALSE as per user request
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);

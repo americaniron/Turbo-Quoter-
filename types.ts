@@ -12,7 +12,9 @@ export interface QuoteItem {
   weight: number; 
   unitPrice: number;
   originalImages?: string[]; 
-  availability?: string; 
+  availability?: string;
+  notes?: string;
+  lineNo?: string;
 }
 
 export interface ClientInfo {
@@ -67,6 +69,7 @@ export enum ParseMode {
 declare global {
   interface Window {
     pdfjsLib: any;
+    pdfjsLibUrl?: string;
     XLSX: any;
   }
 }

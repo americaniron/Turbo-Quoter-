@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { AppConfig, ClientInfo, ParseMode, QuoteItem, SavedClient, User } from '../types.ts';
 import { parseTextData, parsePdfFile, parseExcelFile } from '../services/parserService.ts';
@@ -59,7 +58,9 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   const [showShipping, setShowShipping] = useState(false);
   const [showAddressBook, setShowAddressBook] = useState(false);
   const [bookSearch, setBookSearch] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const excelInputRef = useRef<HTMLInputElement>(null);
 
   const handleProcess = async () => {
     setStatus("Processing...");
@@ -69,23 +70,32 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         if (!textInput.trim()) throw new Error("Please paste text first.");
         items = parseTextData(textInput);
       } else if (activeTab === ParseMode.PDF) {
-        const fileInput = document.getElementById('pdfFile') as HTMLInputElement;
-        if (fileInput?.files?.[0]) items = await parsePdfFile(fileInput.files[0]);
-        else throw new Error("Please select a PDF file first.");
+        const file = pdfInputRef.current?.files?.[0];
+        if (file) {
+          items = await parsePdfFile(file);
+        } else {
+          throw new Error("Please select a PDF file first.");
+        }
       } else if (activeTab === ParseMode.EXCEL) {
-        const fileInput = document.getElementById('excelFile') as HTMLInputElement;
-        if (fileInput?.files?.[0]) items = await parseExcelFile(fileInput.files[0]);
-        else throw new Error("Please select an Excel file first.");
+        const file = excelInputRef.current?.files?.[0];
+        if (file) {
+          items = await parseExcelFile(file);
+        } else {
+          throw new Error("Please select an Excel file first.");
+        }
       }
       
-      if (items.length === 0) throw new Error("No items detected in source.");
+      if (items.length === 0) {
+        throw new Error("No items detected in source. Please check the document format.");
+      }
       onDataLoaded(items);
-      setStatus("Document Ready");
+      setStatus("Success");
     } catch (err: any) {
+      console.error(err);
+      setStatus(err.message ? `Error: ${err.message.substring(0, 20)}...` : "Parsing Error");
       alert(err.message || "Parsing Error");
-      setStatus("Error");
     } finally {
-      setTimeout(() => setStatus("Ready"), 2000);
+      setTimeout(() => setStatus("Ready"), 3000);
     }
   };
 
@@ -211,14 +221,14 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                 {customLogo ? <img src={customLogo} alt="Logo" className="h-24 w-auto object-contain" /> : <Logo className="h-24 w-auto object-contain" />}
             </div>
             <button 
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => logoInputRef.current?.click()}
                 className="absolute -bottom-4 -right-4 bg-slate-900 text-white text-[9px] font-black uppercase px-5 py-2.5 rounded-2xl cursor-pointer shadow-2xl hover:bg-indigo-600 transition-all border-4 border-white active:scale-95"
             >
                 UPLOAD LOGO
             </button>
             <input 
                 type="file" 
-                ref={fileInputRef}
+                ref={logoInputRef}
                 className="hidden" 
                 accept="image/*" 
                 onChange={handleLogoUpload} 
@@ -404,8 +414,11 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                 <div className="w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center shadow-xl mb-6 text-slate-400 group-hover/upload:text-indigo-600 transition-colors border border-slate-100">
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
                 </div>
-                <p className="text-[14px] font-black uppercase text-slate-500 tracking-[0.3em] group-hover/upload:text-indigo-600 transition-colors">INITIATE {activeTab} PARSING</p>
-                <input id={activeTab === ParseMode.PDF ? 'pdfFile' : 'excelFile'} type="file" className="hidden" />
+                <p className="text-[14px] font-black uppercase text-slate-500 tracking-[0.3em] group-hover/upload:text-indigo-600 transition-colors">
+                  {activeTab === ParseMode.PDF ? 'Select PDF Quote' : 'Select Excel Manifest'}
+                </p>
+                <input ref={pdfInputRef} type="file" className={activeTab === ParseMode.PDF ? "hidden" : "absolute inset-0 opacity-0 pointer-events-none"} accept=".pdf" />
+                <input ref={excelInputRef} type="file" className={activeTab === ParseMode.EXCEL ? "hidden" : "absolute inset-0 opacity-0 pointer-events-none"} accept=".xlsx,.xls,.csv" />
             </label>
             )}
             <div className="absolute top-6 right-10 text-[10px] font-black text-indigo-400 opacity-20 group-hover:opacity-60 transition-opacity tracking-[0.5em]">SYSTEM_I/O_01</div>
