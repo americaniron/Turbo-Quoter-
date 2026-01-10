@@ -226,27 +226,13 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
 
       {/* Terms & Conditions Section */}
       <div className="mt-auto border-t border-gray-200 pt-8 pb-4 break-inside-avoid">
-        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 mb-4 text-center">Important Notice – Parts & Equipment Terms</h4>
-        <div className="text-[8.5px] text-gray-500 leading-normal space-y-3 text-justify px-4">
+        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-900 mb-4 text-center">NEW PARTS TERMS / WARRANTY DISCLAIMER / LIMITATION OF LIABILITY</h4>
+        <div className="text-[8.5px] text-gray-500 leading-normal space-y-4 text-justify px-4">
             <p>
-                <span className="font-black text-gray-900">WARRANTY DISCLAIMER:</span> Unless expressly stated in writing, Seller provides no warranty, express or implied, including any warranty of merchantability, fitness for a particular purpose, or non-infringement. All goods (including used, surplus, rebuilt, remanufactured, or refurbished items) are sold <span className="font-black italic">AS-IS, WHERE-IS</span>, with all faults. Buyer acknowledges that condition may vary and that any inspection reports, photos, and descriptions are approximate and for reference only.
+                All products sold by <span className="font-black text-gray-900">American Iron LLC</span> are brand new. Except as expressly stated in writing by Seller, Seller disclaims all warranties, express or implied, including any implied warranties of merchantability and fitness for a particular purpose. Any warranty coverage offered with the product (if any) is provided solely by the product’s manufacturer and is governed by the manufacturer’s warranty terms, procedures, and limitations; Seller does not control manufacturer warranty determinations.
             </p>
             <p>
-                <span className="font-black text-gray-900">BUYER RESPONSIBILITY:</span> Buyer is responsible for confirming part numbers, measurements, serial-number ranges, interchangeability, calibration/programming requirements, and proper installation by qualified personnel. Seller is not responsible for improper installation, misuse, normal wear, contamination, overheating, lack of maintenance, or application outside intended design.
-            </p>
-            <div className="grid grid-cols-2 gap-6">
-                <p>
-                    <span className="font-black text-gray-900">CORE/EXCHANGE ITEMS:</span> Core charges apply where indicated and are refundable only upon receipt and acceptance of the returned core in accordance with Seller’s core requirements (completeness, rebuildability, and return timelines).
-                </p>
-                <p>
-                    <span className="font-black text-gray-900">TITLE/RISK OF LOSS:</span> Title and risk of loss pass to Buyer upon pickup or tender to carrier (FOB Seller location) unless otherwise stated in writing.
-                </p>
-            </div>
-            <p>
-                <span className="font-black text-gray-900">LIMITATION OF LIABILITY:</span> Seller’s maximum liability shall not exceed the amount paid for the specific item giving rise to the claim. Seller shall not be liable for labor, removal/installation, travel, towing, freight, demurrage, downtime, loss of use, lost profits, or any incidental/consequential damages.
-            </p>
-            <p className="border-t border-gray-100 pt-3 text-center">
-                <span className="font-black text-gray-900 uppercase">Returns:</span> No returns without prior written authorization; returns may be subject to restocking fees and must be in original condition/packaging.
+                Buyer is solely responsible for confirming part number accuracy, compatibility, serial-number range/application, and proper installation. Seller shall not be liable for labor, removal/installation, travel, towing, freight, downtime, loss of profits, loss of use, or any indirect, incidental, special, or consequential damages. Seller’s maximum liability for any claim is limited to the invoice price paid for the specific item(s) giving rise to the claim, at Seller’s option. Title and risk of loss transfer upon pickup or tender to carrier unless otherwise agreed in writing.
             </p>
         </div>
         <div className="mt-8 text-center text-[9px] font-black text-gray-300 uppercase tracking-[0.4em]">
