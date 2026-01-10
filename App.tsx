@@ -2,10 +2,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
-import { QuoteItem, ClientInfo, AppConfig } from './types.ts';
+import { QuoteItem, ClientInfo, AppConfig, SavedClient } from './types.ts';
 import { analyzeQuoteData } from './services/geminiService.ts';
 
-// Helper to generate a unique professional ID
 const generateDocumentId = (isInvoice: boolean) => {
   const prefix = isInvoice ? 'INV' : 'QT';
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -14,7 +13,6 @@ const generateDocumentId = (isInvoice: boolean) => {
 };
 
 const App: React.FC = () => {
-  // Helper to get date 10 days from now in YYYY-MM-DD
   const getDefaultExpiration = () => {
     const d = new Date();
     d.setDate(d.getDate() + 10);
@@ -22,24 +20,33 @@ const App: React.FC = () => {
   };
 
   const [items, setItems] = useState<QuoteItem[]>([]);
+  const [addressBook, setAddressBook] = useState<SavedClient[]>([]);
   const [client, setClient] = useState<ClientInfo>({ 
     company: '', 
     contactName: '',
     email: '', 
     phone: '',
     address: '',
-    cityStateZip: ''
+    city: '',
+    state: '',
+    zip: '',
+    country: 'United States'
   });
   const [config, setConfig] = useState<AppConfig>({ 
     markupPercentage: 25, 
-    discountPercentage: 0, // Default to no discount
+    discountPercentage: 0,
     quoteId: generateDocumentId(false),
     poNumber: '',
     expirationDate: getDefaultExpiration(),
     logisticsRate: 2.50,
     isInvoice: false,
     weightUnit: 'LBS',
-    shippingAddress: ''
+    shippingCompany: '',
+    shippingAddress: '',
+    shippingCity: '',
+    shippingState: '',
+    shippingZip: '',
+    shippingCountry: 'United States'
   });
   const [aiEnabled, setAiEnabled] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
@@ -47,24 +54,32 @@ const App: React.FC = () => {
   const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
   
-  // Reference for scrolling to results
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // Check for existing draft on mount
+  // Load persistence data
   useEffect(() => {
     const draft = localStorage.getItem('american_iron_draft');
     if (draft) setHasDraft(true);
+
+    const savedBook = localStorage.getItem('american_iron_address_book');
+    if (savedBook) {
+      try {
+        setAddressBook(JSON.parse(savedBook));
+      } catch (e) {
+        console.error("Failed to parse address book", e);
+      }
+    }
   }, []);
+
+  // Save address book whenever it changes
+  useEffect(() => {
+    localStorage.setItem('american_iron_address_book', JSON.stringify(addressBook));
+  }, [addressBook]);
 
   const handleDataLoaded = (newItems: QuoteItem[]) => {
     setItems(newItems);
     setAiAnalysis(null);
-    
-    setConfig(prev => ({
-        ...prev,
-        quoteId: generateDocumentId(prev.isInvoice)
-    }));
-
+    setConfig(prev => ({ ...prev, quoteId: generateDocumentId(prev.isInvoice) }));
     setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -78,25 +93,23 @@ const App: React.FC = () => {
     setIsAnalyzing(false);
   };
 
+  const handleSaveToBook = (newClient: ClientInfo) => {
+    const id = Date.now().toString();
+    setAddressBook(prev => [...prev, { ...newClient, id }]);
+  };
+
+  const handleDeleteFromBook = (id: string) => {
+    setAddressBook(prev => prev.filter(c => c.id !== id));
+  };
+
   const handleSaveQuote = () => {
-    const data = {
-      version: '1.2',
-      timestamp: new Date().toISOString(),
-      items,
-      client,
-      config,
-      customLogo,
-      aiAnalysis
-    };
-    
+    const data = { version: '1.4', timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    
     const dateStr = new Date().toISOString().split('T')[0];
     link.download = `${config.isInvoice ? 'INVOICE' : 'QUOTE'}-${config.quoteId.replace(/[^a-z0-9]/gi, '_')}-${dateStr}.json`;
-    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -107,26 +120,14 @@ const App: React.FC = () => {
     reader.onload = (e) => {
       try {
         const json = JSON.parse(e.target?.result as string);
-        
-        if (json.items) {
-            const migratedItems = json.items.map((item: any) => ({
-                ...item,
-                originalImages: item.originalImages || (item.originalImage ? [item.originalImage] : [])
-            }));
-            setItems(migratedItems);
-        }
-
+        if (json.items) setItems(json.items);
         if (json.client) setClient(prev => ({ ...prev, ...json.client }));
         if (json.config) setConfig(prev => ({ ...prev, ...json.config }));
-        
         setCustomLogo(json.customLogo || null);
         setAiAnalysis(json.aiAnalysis || null);
-        
-        setTimeout(() => {
-            resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
+        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       } catch (err) {
-        alert("Failed to load quote file. Invalid format.");
+        alert("Failed to load quote file.");
       }
     };
     reader.readAsText(file);
@@ -152,7 +153,7 @@ const App: React.FC = () => {
       if (draft) {
         const json = JSON.parse(draft);
         if (json.items) setItems(json.items);
-        if (json.client) setClient(json.client);
+        if (json.client) setClient(prev => ({ ...prev, ...json.client }));
         if (json.config) setConfig(prev => ({ ...prev, ...json.config }));
         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       }
@@ -160,10 +161,7 @@ const App: React.FC = () => {
   };
 
   const handleRefreshId = useCallback(() => {
-    setConfig(prev => ({
-        ...prev,
-        quoteId: generateDocumentId(prev.isInvoice)
-    }));
+    setConfig(prev => ({ ...prev, quoteId: generateDocumentId(prev.isInvoice) }));
   }, []);
 
   return (
@@ -186,6 +184,9 @@ const App: React.FC = () => {
         customLogo={customLogo}
         onLogoUpload={setCustomLogo}
         onRefreshId={handleRefreshId}
+        addressBook={addressBook}
+        onSaveToBook={handleSaveToBook}
+        onDeleteFromBook={handleDeleteFromBook}
       />
       
       <div ref={resultRef}>

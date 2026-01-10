@@ -15,21 +15,33 @@ export interface ClientInfo {
   email: string;
   phone: string;
   address: string;
-  cityStateZip: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
+export interface SavedClient extends ClientInfo {
+  id: string;
 }
 
 export interface AppConfig {
   markupPercentage: number;
-  discountPercentage: number; // Added discount field
+  discountPercentage: number;
   quoteId: string;
   poNumber: string;
   expirationDate: string; // YYYY-MM-DD format
   logisticsRate: number;
   isInvoice: boolean;
   weightUnit: 'LBS' | 'KG';
-  paymentTerms?: string; // e.g., Net 30
-  specialInstructions?: string; // e.g., Shipping instructions or Wire info
-  shippingAddress?: string; // If different from billing
+  paymentTerms?: string;
+  specialInstructions?: string;
+  shippingCompany?: string;
+  shippingAddress?: string;
+  shippingCity?: string;
+  shippingState?: string;
+  shippingZip?: string;
+  shippingCountry?: string;
 }
 
 export enum ParseMode {
@@ -38,7 +50,6 @@ export enum ParseMode {
   EXCEL = 'excel'
 }
 
-// Extend window for library access if needed
 declare global {
   interface Window {
     pdfjsLib: any;
