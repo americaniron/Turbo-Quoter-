@@ -37,6 +37,7 @@ export interface AppConfig {
   paymentTerms?: string;
   specialInstructions?: string;
   shippingCompany?: string;
+  shippingPhone?: string;
   shippingAddress?: string;
   shippingCity?: string;
   shippingState?: string;

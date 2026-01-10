@@ -207,7 +207,8 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           <div className="grid grid-cols-4 gap-2">
              <input className="col-span-4 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="Company Name" value={client.company} onChange={(e) => updateClient('company', e.target.value)} />
              <input className="col-span-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="Contact Name" value={client.contactName} onChange={(e) => updateClient('contactName', e.target.value)} />
-             <input className="col-span-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="Email" value={client.email} onChange={(e) => updateClient('email', e.target.value)} />
+             <input className="col-span-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="Phone Number" value={client.phone} onChange={(e) => updateClient('phone', e.target.value)} />
+             <input className="col-span-4 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="Email Address" value={client.email} onChange={(e) => updateClient('email', e.target.value)} />
              <input className="col-span-4 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="Street Address" value={client.address} onChange={(e) => updateClient('address', e.target.value)} />
              <input className="col-span-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="City" value={client.city} onChange={(e) => updateClient('city', e.target.value)} />
              <input 
@@ -247,6 +248,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           {showShipping ? (
             <div className="grid grid-cols-4 gap-2">
               <input className="col-span-4 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="Shipping Company (Optional)" value={config.shippingCompany} onChange={(e) => updateConfig('shippingCompany', e.target.value)} />
+              <input className="col-span-4 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="Shipping Phone (Optional)" value={config.shippingPhone} onChange={(e) => updateConfig('shippingPhone', e.target.value)} />
               <input className="col-span-4 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="Street Address" value={config.shippingAddress} onChange={(e) => updateConfig('shippingAddress', e.target.value)} />
               <input className="col-span-2 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" placeholder="City" value={config.shippingCity} onChange={(e) => updateConfig('shippingCity', e.target.value)} />
               <input 
@@ -266,7 +268,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
               </select>
             </div>
           ) : (
-            <div className="h-[154px] flex items-center justify-center border-2 border-dashed border-slate-100 rounded-xl text-slate-300 text-[10px] font-black uppercase">
+            <div className="h-[212px] flex items-center justify-center border-2 border-dashed border-slate-100 rounded-xl text-slate-300 text-[10px] font-black uppercase">
               Same as Billing
             </div>
           )}

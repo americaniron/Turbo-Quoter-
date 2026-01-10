@@ -29,13 +29,14 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
 
   const accentColor = config.isInvoice ? '#ef4444' : '#ffcd00';
 
-  const formatAddress = (comp: string, addr: string, city: string, state: string, zip: string, country: string) => {
+  const formatAddress = (comp: string, addr: string, city: string, state: string, zip: string, country: string, phone?: string) => {
     return (
       <div className="text-[11px] leading-relaxed">
         <p className="font-black text-gray-900 uppercase">{comp || 'Valued Customer'}</p>
         <p className="font-bold">{addr || '---'}</p>
         <p>{city}{city && state ? ', ' : ''}{state} {zip}</p>
         <p className="font-black uppercase tracking-widest text-[9px] mt-1 text-gray-400">{country}</p>
+        {phone && <p className="text-[9px] font-bold text-gray-500 mt-1 uppercase">PH: {phone}</p>}
       </div>
     );
   };
@@ -50,14 +51,22 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
             <div className="grid grid-cols-2 gap-8">
                 <div>
                     <h3 className="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-2 border-b">Bill To</h3>
-                    {formatAddress(client.company, client.address, client.city, client.state, client.zip, client.country)}
+                    {formatAddress(client.company, client.address, client.city, client.state, client.zip, client.country, client.phone)}
                     <p className="text-[10px] text-gray-500 mt-2">{client.contactName}</p>
                     <p className="text-[10px] text-gray-500">{client.email}</p>
                 </div>
                 <div>
                     <h3 className="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-2 border-b">Ship To</h3>
                     {config.shippingAddress ? 
-                      formatAddress(config.shippingCompany || client.company, config.shippingAddress, config.shippingCity || '', config.shippingState || '', config.shippingZip || '', config.shippingCountry || '') 
+                      formatAddress(
+                        config.shippingCompany || client.company, 
+                        config.shippingAddress, 
+                        config.shippingCity || '', 
+                        config.shippingState || '', 
+                        config.shippingZip || '', 
+                        config.shippingCountry || '',
+                        config.shippingPhone
+                      ) 
                       : <p className="text-gray-400 text-[10px] italic">Same as Billing Address</p>
                     }
                 </div>

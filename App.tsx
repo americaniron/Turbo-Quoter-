@@ -42,6 +42,7 @@ const App: React.FC = () => {
     isInvoice: false,
     weightUnit: 'LBS',
     shippingCompany: '',
+    shippingPhone: '',
     shippingAddress: '',
     shippingCity: '',
     shippingState: '',
@@ -94,6 +95,16 @@ const App: React.FC = () => {
   };
 
   const handleSaveToBook = (newClient: ClientInfo) => {
+    // Prevent duplicate companies (case insensitive)
+    const isDuplicate = addressBook.some(c => 
+      c.company.trim().toLowerCase() === newClient.company.trim().toLowerCase()
+    );
+
+    if (isDuplicate) {
+      alert(`"${newClient.company}" already exists in your Address Book.`);
+      return;
+    }
+
     const id = Date.now().toString();
     setAddressBook(prev => [...prev, { ...newClient, id }]);
   };
@@ -103,7 +114,7 @@ const App: React.FC = () => {
   };
 
   const handleSaveQuote = () => {
-    const data = { version: '1.4', timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
+    const data = { version: '1.5', timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
