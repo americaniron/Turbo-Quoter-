@@ -20,6 +20,7 @@ export interface ClientInfo {
 
 export interface AppConfig {
   markupPercentage: number;
+  discountPercentage: number; // Added discount field
   quoteId: string;
   poNumber: string;
   expirationDate: string; // YYYY-MM-DD format

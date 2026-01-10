@@ -32,6 +32,7 @@ const App: React.FC = () => {
   });
   const [config, setConfig] = useState<AppConfig>({ 
     markupPercentage: 25, 
+    discountPercentage: 0, // Default to no discount
     quoteId: generateDocumentId(false),
     poNumber: '',
     expirationDate: getDefaultExpiration(),
@@ -79,7 +80,7 @@ const App: React.FC = () => {
 
   const handleSaveQuote = () => {
     const data = {
-      version: '1.1',
+      version: '1.2',
       timestamp: new Date().toISOString(),
       items,
       client,

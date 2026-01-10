@@ -22,8 +22,16 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
 
   const totalWeight = items.reduce((sum, item) => sum + (item.weight * conversionFactor * item.qty), 0);
   const logisticsCost = totalWeight * (config.logisticsRate || 0);
-  const subtotal = items.reduce((sum, item) => sum + (item.unitPrice * markupMultiplier * item.qty), 0);
-  const total = subtotal + logisticsCost;
+  
+  // Calculate raw subtotal with markup
+  const subtotalBeforeDiscount = items.reduce((sum, item) => sum + (item.unitPrice * markupMultiplier * item.qty), 0);
+  
+  // Calculate discount on items only
+  const discountAmount = subtotalBeforeDiscount * (config.discountPercentage / 100);
+  const netSubtotal = subtotalBeforeDiscount - discountAmount;
+  
+  // Final total including net items and logistics
+  const total = netSubtotal + logisticsCost;
 
   const accentColor = config.isInvoice ? '#ef4444' : '#ffcd00';
 
@@ -184,9 +192,20 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
          </div>
          <div className="w-80 space-y-4">
              <div className="flex justify-between items-center text-[11px] font-black text-gray-500 uppercase tracking-widest">
-                 <span>Subtotal</span>
-                 <span className="text-gray-900">${subtotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                 <span>Items Subtotal</span>
+                 <span className="text-gray-900">${subtotalBeforeDiscount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
              </div>
+             
+             {config.discountPercentage > 0 && (
+                <div className="flex justify-between items-center text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                    <span className="flex items-center gap-2">
+                        Discount Applied ({config.discountPercentage}%)
+                        <span className="px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[8px]">PROMO</span>
+                    </span>
+                    <span className="text-red-600">-${discountAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                </div>
+             )}
+
              <div className="flex justify-between items-center text-[11px] font-black text-gray-500 uppercase tracking-widest">
                  <span>Logistics & Handling</span>
                  <span className="text-gray-900">${logisticsCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>

@@ -105,6 +105,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   };
 
   const markupOptions = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 75, 100];
+  const discountOptions = [0, 5, 10, 15, 20, 25, 30, 40, 50];
 
   return (
     <div className="max-w-5xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-slate-200 mb-8 no-print">
@@ -215,39 +216,50 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">Markup (%)</label>
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-3 mb-6">
+        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <label className="block text-[9px] font-black uppercase text-black mb-1.5 tracking-widest">Markup (%)</label>
           <div className="relative">
-            <select value={config.markupPercentage} onChange={(e) => updateConfig('markupPercentage', parseInt(e.target.value))} className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white outline-none appearance-none cursor-pointer focus:ring-2 focus:ring-yellow-400">
+            <select value={config.markupPercentage} onChange={(e) => updateConfig('markupPercentage', parseInt(e.target.value))} className="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-[11px] text-white outline-none appearance-none cursor-pointer focus:ring-1 focus:ring-yellow-400">
               {markupOptions.map(opt => <option key={opt} value={opt} className="bg-slate-900 text-white">{opt}%</option>)}
             </select>
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
           </div>
         </div>
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">Weight Unit</label>
-          <div className="flex bg-white rounded-xl border border-slate-200 overflow-hidden">
-                <button onClick={() => updateConfig('weightUnit', 'LBS')} className={`flex-1 py-2 text-[10px] font-black uppercase ${config.weightUnit === 'LBS' ? 'bg-[#ffcd00] text-black' : 'text-slate-400'}`}>LBS</button>
-                <button onClick={() => updateConfig('weightUnit', 'KG')} className={`flex-1 py-2 text-[10px] font-black uppercase ${config.weightUnit === 'KG' ? 'bg-[#ffcd00] text-black' : 'text-slate-400'}`}>KG</button>
-          </div>
-        </div>
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 relative group">
-          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">Document #</label>
+        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <label className="block text-[9px] font-black uppercase text-black mb-1.5 tracking-widest">Discount (%)</label>
           <div className="relative">
-            <input type="text" value={config.quoteId} onChange={(e) => updateConfig('quoteId', e.target.value)} className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-mono text-white uppercase outline-none pr-10 focus:ring-2 focus:ring-yellow-400" />
-            {onRefreshId && <button onClick={onRefreshId} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-yellow-400 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></button>}
+            <select value={config.discountPercentage} onChange={(e) => updateConfig('discountPercentage', parseInt(e.target.value))} className="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-[11px] text-white outline-none appearance-none cursor-pointer focus:ring-1 focus:ring-yellow-400">
+              {discountOptions.map(opt => <option key={opt} value={opt} className="bg-slate-900 text-white">{opt}%</option>)}
+            </select>
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
           </div>
         </div>
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">P.O. Number</label>
-          <input type="text" value={config.poNumber} onChange={(e) => updateConfig('poNumber', e.target.value)} placeholder="Optional" className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white outline-none focus:ring-2 focus:ring-yellow-400" />
+        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <label className="block text-[9px] font-black uppercase text-black mb-1.5 tracking-widest">Weight Unit</label>
+          <div className="flex bg-white rounded-lg border border-slate-200 overflow-hidden">
+                <button onClick={() => updateConfig('weightUnit', 'LBS')} className={`flex-1 py-1.5 text-[9px] font-black uppercase ${config.weightUnit === 'LBS' ? 'bg-[#ffcd00] text-black' : 'text-slate-400'}`}>LBS</button>
+                <button onClick={() => updateConfig('weightUnit', 'KG')} className={`flex-1 py-1.5 text-[9px] font-black uppercase ${config.weightUnit === 'KG' ? 'bg-[#ffcd00] text-black' : 'text-slate-400'}`}>KG</button>
+          </div>
         </div>
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-          <label className="block text-[9px] font-black uppercase text-black mb-2 tracking-widest">{config.isInvoice ? 'Due Date' : 'Valid Until'}</label>
-          <input type="date" value={config.expirationDate} onChange={(e) => updateConfig('expirationDate', e.target.value)} className="w-full p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white outline-none [color-scheme:dark] focus:ring-2 focus:ring-yellow-400" />
+        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 relative group">
+          <label className="block text-[9px] font-black uppercase text-black mb-1.5 tracking-widest">Document #</label>
+          <div className="relative">
+            <input type="text" value={config.quoteId} onChange={(e) => updateConfig('quoteId', e.target.value)} className="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-[11px] font-mono text-white uppercase outline-none pr-8 focus:ring-1 focus:ring-yellow-400" />
+            {onRefreshId && <button onClick={onRefreshId} className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-yellow-400 transition-colors"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></button>}
+          </div>
+        </div>
+        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <label className="block text-[9px] font-black uppercase text-black mb-1.5 tracking-widest">P.O. Number</label>
+          <input type="text" value={config.poNumber} onChange={(e) => updateConfig('poNumber', e.target.value)} placeholder="Optional" className="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-[11px] text-white outline-none focus:ring-1 focus:ring-yellow-400" />
+        </div>
+        <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <label className="block text-[9px] font-black uppercase text-black mb-1.5 tracking-widest">{config.isInvoice ? 'Due Date' : 'Valid Until'}</label>
+          <input type="date" value={config.expirationDate} onChange={(e) => updateConfig('expirationDate', e.target.value)} className="w-full p-2 bg-slate-900 border border-slate-700 rounded-lg text-[11px] text-white outline-none [color-scheme:dark] focus:ring-1 focus:ring-yellow-400" />
         </div>
       </div>
 
