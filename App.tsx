@@ -1,9 +1,17 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
 import { QuoteItem, ClientInfo, AppConfig } from './types.ts';
 import { analyzeQuoteData } from './services/geminiService.ts';
+
+// Helper to generate a unique professional ID
+const generateDocumentId = (isInvoice: boolean) => {
+  const prefix = isInvoice ? 'INV' : 'QT';
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const randomHex = Math.floor(Math.random() * 0x10000).toString(16).toUpperCase().padStart(4, '0');
+  return `AI-${prefix}-${dateStr}-${randomHex}`;
+};
 
 const App: React.FC = () => {
   // Helper to get date 10 days from now in YYYY-MM-DD
@@ -14,14 +22,23 @@ const App: React.FC = () => {
   };
 
   const [items, setItems] = useState<QuoteItem[]>([]);
-  const [client, setClient] = useState<ClientInfo>({ company: '', email: '', phone: '' });
+  const [client, setClient] = useState<ClientInfo>({ 
+    company: '', 
+    contactName: '',
+    email: '', 
+    phone: '',
+    address: '',
+    cityStateZip: ''
+  });
   const [config, setConfig] = useState<AppConfig>({ 
     markupPercentage: 25, 
-    quoteId: 'AI-2025-CAT',
+    quoteId: generateDocumentId(false),
+    poNumber: '',
     expirationDate: getDefaultExpiration(),
     logisticsRate: 2.50,
     isInvoice: false,
-    weightUnit: 'LBS'
+    weightUnit: 'LBS',
+    shippingAddress: ''
   });
   const [aiEnabled, setAiEnabled] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
@@ -40,9 +57,13 @@ const App: React.FC = () => {
 
   const handleDataLoaded = (newItems: QuoteItem[]) => {
     setItems(newItems);
-    setAiAnalysis(null); // Reset analysis when new data loads
+    setAiAnalysis(null);
     
-    // Smooth scroll to preview
+    setConfig(prev => ({
+        ...prev,
+        quoteId: generateDocumentId(prev.isInvoice)
+    }));
+
     setTimeout(() => {
         resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
@@ -56,10 +77,9 @@ const App: React.FC = () => {
     setIsAnalyzing(false);
   };
 
-  // --- Feature: Save Quote to File ---
   const handleSaveQuote = () => {
     const data = {
-      version: '1.0',
+      version: '1.1',
       timestamp: new Date().toISOString(),
       items,
       client,
@@ -73,7 +93,6 @@ const App: React.FC = () => {
     const link = document.createElement('a');
     link.href = url;
     
-    // Naming convention: QuoteID_YYYY-MM-DD.json
     const dateStr = new Date().toISOString().split('T')[0];
     link.download = `${config.isInvoice ? 'INVOICE' : 'QUOTE'}-${config.quoteId.replace(/[^a-z0-9]/gi, '_')}-${dateStr}.json`;
     
@@ -82,7 +101,6 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  // --- Feature: Load Quote from File ---
   const handleLoadQuote = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -90,7 +108,6 @@ const App: React.FC = () => {
         const json = JSON.parse(e.target?.result as string);
         
         if (json.items) {
-            // Migration: Convert single originalImage to array if needed
             const migratedItems = json.items.map((item: any) => ({
                 ...item,
                 originalImages: item.originalImages || (item.originalImage ? [item.originalImage] : [])
@@ -98,119 +115,55 @@ const App: React.FC = () => {
             setItems(migratedItems);
         }
 
-        if (json.client) setClient(json.client);
-        
-        if (json.config) {
-            // Sanitize Config: Ensure markup is one of the valid positive options
-            const rawMarkup = json.config.markupPercentage;
-            const validMarkups = [10, 15, 20, 25, 30, 35, 40];
-            let safeMarkup = rawMarkup;
-            
-            // If strictly not in list or negative, default to 25
-            if (!validMarkups.includes(rawMarkup)) {
-                console.warn(`Invalid markup in file: ${rawMarkup}. Defaulting to 25%.`);
-                safeMarkup = 25;
-            }
-            
-            setConfig(prev => ({ 
-                ...prev, 
-                ...json.config,
-                markupPercentage: safeMarkup
-            }));
-        }
+        if (json.client) setClient(prev => ({ ...prev, ...json.client }));
+        if (json.config) setConfig(prev => ({ ...prev, ...json.config }));
         
         setCustomLogo(json.customLogo || null);
         setAiAnalysis(json.aiAnalysis || null);
         
-        // Scroll to preview after loading
         setTimeout(() => {
             resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 100);
       } catch (err) {
         alert("Failed to load quote file. Invalid format.");
-        console.error(err);
       }
     };
     reader.readAsText(file);
   };
 
-  // --- Feature: Save as Draft (Granular Local Storage) ---
   const handleSaveDraft = (options: { items: boolean; client: boolean; config: boolean }) => {
     try {
-      // 1. Get existing draft to preserve unselected sections
       const existingDraftStr = localStorage.getItem('american_iron_draft');
       let draftData = existingDraftStr ? JSON.parse(existingDraftStr) : {};
-
-      // 2. Update metadata
-      draftData.version = 'draft';
-      draftData.timestamp = new Date().toISOString();
-
-      // 3. Update only selected sections
-      if (options.items) {
-          draftData.items = items;
-          draftData.aiAnalysis = aiAnalysis; // AI analysis is tied to items
-      }
-      
-      if (options.client) {
-          draftData.client = client;
-      }
-      
-      if (options.config) {
-          draftData.config = config;
-          draftData.customLogo = customLogo; // Logo is part of config/branding
-      }
-
-      // 4. Save back to storage
+      if (options.items) draftData.items = items;
+      if (options.client) draftData.client = client;
+      if (options.config) draftData.config = config;
       localStorage.setItem('american_iron_draft', JSON.stringify(draftData));
       setHasDraft(true);
     } catch (e) {
-      console.error(e);
-      alert("Could not save draft. Local storage might be full (image too large). Try 'Save File' instead.");
+      alert("Could not save draft.");
     }
   };
 
-  // --- Feature: Resume Draft (Local Storage) ---
   const handleResumeDraft = () => {
     try {
       const draft = localStorage.getItem('american_iron_draft');
       if (draft) {
         const json = JSON.parse(draft);
-        
-        // We only restore what is present in the draft
-        if (json.items) {
-             const migratedItems = json.items.map((item: any) => ({
-                ...item,
-                originalImages: item.originalImages || (item.originalImage ? [item.originalImage] : [])
-            }));
-            setItems(migratedItems);
-        }
+        if (json.items) setItems(json.items);
         if (json.client) setClient(json.client);
-        
-        // Sanitize Config for Drafts too
-        if (json.config) {
-            const validMarkups = [10, 15, 20, 25, 30, 35, 40];
-            let safeMarkup = json.config.markupPercentage || 25;
-            if (!validMarkups.includes(safeMarkup)) safeMarkup = 25;
-
-            setConfig(prev => ({ 
-                ...prev, 
-                ...json.config,
-                markupPercentage: safeMarkup
-            }));
-        }
-        
-        if (json.customLogo) setCustomLogo(json.customLogo);
-        if (json.aiAnalysis) setAiAnalysis(json.aiAnalysis);
-        
-        setTimeout(() => {
-            resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
+        if (json.config) setConfig(prev => ({ ...prev, ...json.config }));
+        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       }
-    } catch (e) {
-       console.error(e);
-       alert("Draft file is corrupted.");
-    }
+    } catch (e) {}
   };
+
+  const handleRefreshId = useCallback(() => {
+    setConfig(prev => ({
+        ...prev,
+        quoteId: generateDocumentId(prev.isInvoice)
+    }));
+  }, []);
 
   return (
     <div className="min-h-screen pb-20 print:min-h-0 print:pb-0 print:bg-white">
@@ -228,8 +181,10 @@ const App: React.FC = () => {
         aiEnabled={aiEnabled}
         isAnalyzing={isAnalyzing}
         config={config}
+        client={client}
         customLogo={customLogo}
         onLogoUpload={setCustomLogo}
+        onRefreshId={handleRefreshId}
       />
       
       <div ref={resultRef}>

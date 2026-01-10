@@ -11,17 +11,24 @@ export interface QuoteItem {
 
 export interface ClientInfo {
   company: string;
+  contactName: string;
   email: string;
   phone: string;
+  address: string;
+  cityStateZip: string;
 }
 
 export interface AppConfig {
   markupPercentage: number;
   quoteId: string;
+  poNumber: string;
   expirationDate: string; // YYYY-MM-DD format
   logisticsRate: number;
   isInvoice: boolean;
   weightUnit: 'LBS' | 'KG';
+  paymentTerms?: string; // e.g., Net 30
+  specialInstructions?: string; // e.g., Shipping instructions or Wire info
+  shippingAddress?: string; // If different from billing
 }
 
 export enum ParseMode {
