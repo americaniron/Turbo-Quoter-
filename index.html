@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#121212" />
+    <meta name="description" content="American Iron Logistics & Supply Hub - Global Heavy Machinery Quoting System" />
     <title>American Iron Hub</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -86,15 +88,13 @@
                 pointer-events: none;
                 z-index: 9999;
             }
-            .print-footer-text::after {
+            /* Fixed selector to match React component class */
+            .page-number::after {
                 counter-increment: page;
-                content: "Page " counter(page);
+                content: counter(page);
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 8px;
                 font-weight: 800;
-                text-transform: uppercase;
-                letter-spacing: 0.4em;
-                color: #94a3b8;
             }
         }
 
