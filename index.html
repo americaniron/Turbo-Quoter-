@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -9,14 +10,13 @@
     <!-- PDF.js & XLSX CDNs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script>
         // Polyfill process.env safely
         try {
             if (!window.process) {
                 window.process = { env: { API_KEY: '' } };
             } else if (!window.process.env) {
-                // If process exists but env doesn't, try to assign env
                 try {
                     window.process.env = { API_KEY: '' };
                 } catch (e) {
@@ -34,14 +34,32 @@
         };
     </script>
     <style>
-        body { font-family: 'Roboto', sans-serif; background-color: #f3f4f5; }
+        :root {
+            --brand-yellow: #ffcd00;
+            --brand-dark: #121212;
+            --brand-indigo: #4f46e5;
+        }
         
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f8fafc; 
+            color: #0f172a; 
+            scroll-behavior: smooth;
+        }
+        
+        /* Custom Industrial Scrollbar */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid #f1f5f9; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--brand-dark); }
+
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
         @media print {
             @page {
-                size: auto; /* Adapts to A4 or Letter based on printer settings */
-                margin: 0; /* We control safe zones via container padding */
+                size: auto;
+                margin: 0;
             }
-            
             body { 
                 background: white; 
                 -webkit-print-color-adjust: exact !important; 
@@ -49,11 +67,27 @@
                 margin: 0;
                 padding: 0;
             }
-
             .no-print { display: none !important; }
-            
-            /* Reset root to allow full height printing without scrollbars */
             #root { margin: 0; padding: 0; width: 100%; height: auto; overflow: visible; }
+        }
+
+        /* Enhanced Input Visual States */
+        input, select, textarea {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+            border-color: var(--brand-indigo) !important;
+            transform: translateY(-1px);
+        }
+
+        /* Animation Classes */
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
   <script type="importmap">

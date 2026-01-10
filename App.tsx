@@ -2,7 +2,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
-import { QuoteItem, ClientInfo, AppConfig, SavedClient } from './types.ts';
+import { Login } from './components/Login.tsx';
+import { QuoteItem, ClientInfo, AppConfig, SavedClient, User } from './types.ts';
 import { analyzeQuoteData } from './services/geminiService.ts';
 
 const generateDocumentId = (isInvoice: boolean) => {
@@ -13,6 +14,11 @@ const generateDocumentId = (isInvoice: boolean) => {
 };
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = sessionStorage.getItem('ai_current_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
   const getDefaultExpiration = () => {
     const d = new Date();
     d.setDate(d.getDate() + 10);
@@ -49,6 +55,7 @@ const App: React.FC = () => {
     shippingZip: '',
     shippingCountry: 'United States'
   });
+  
   const [aiEnabled, setAiEnabled] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -57,25 +64,48 @@ const App: React.FC = () => {
   
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // Load persistence data
-  useEffect(() => {
-    const draft = localStorage.getItem('american_iron_draft');
-    if (draft) setHasDraft(true);
+  // User-specific storage keys
+  const getStorageKey = (base: string) => user ? `${base}_${user.username}` : base;
 
-    const savedBook = localStorage.getItem('american_iron_address_book');
+  // Persistence management
+  useEffect(() => {
+    if (!user) return;
+
+    const draft = localStorage.getItem(getStorageKey('american_iron_draft'));
+    setHasDraft(!!draft);
+
+    const savedBook = localStorage.getItem(getStorageKey('american_iron_address_book'));
     if (savedBook) {
       try {
         setAddressBook(JSON.parse(savedBook));
       } catch (e) {
-        console.error("Failed to parse address book", e);
+        setAddressBook([]);
       }
+    } else {
+        setAddressBook([]);
     }
-  }, []);
+    
+    // Reset view state on login
+    setItems([]);
+    setAiAnalysis(null);
+  }, [user]);
 
-  // Save address book whenever it changes
+  // Save address book whenever it changes (user-namespaced)
   useEffect(() => {
-    localStorage.setItem('american_iron_address_book', JSON.stringify(addressBook));
-  }, [addressBook]);
+    if (user) {
+      localStorage.setItem(getStorageKey('american_iron_address_book'), JSON.stringify(addressBook));
+    }
+  }, [addressBook, user]);
+
+  const handleLogin = (u: User) => {
+    sessionStorage.setItem('ai_current_user', JSON.stringify(u));
+    setUser(u);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('ai_current_user');
+    setUser(null);
+  };
 
   const handleDataLoaded = (newItems: QuoteItem[]) => {
     setItems(newItems);
@@ -95,7 +125,6 @@ const App: React.FC = () => {
   };
 
   const handleSaveToBook = (newClient: ClientInfo) => {
-    // Prevent duplicate companies (case insensitive)
     const isDuplicate = addressBook.some(c => 
       c.company.trim().toLowerCase() === newClient.company.trim().toLowerCase()
     );
@@ -114,7 +143,7 @@ const App: React.FC = () => {
   };
 
   const handleSaveQuote = () => {
-    const data = { version: '1.5', timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
+    const data = { version: '1.5', author: user?.username, timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -146,13 +175,15 @@ const App: React.FC = () => {
 
   const handleSaveDraft = (options: { items: boolean; client: boolean; config: boolean }) => {
     try {
-      const existingDraftStr = localStorage.getItem('american_iron_draft');
+      const key = getStorageKey('american_iron_draft');
+      const existingDraftStr = localStorage.getItem(key);
       let draftData = existingDraftStr ? JSON.parse(existingDraftStr) : {};
       if (options.items) draftData.items = items;
       if (options.client) draftData.client = client;
       if (options.config) draftData.config = config;
-      localStorage.setItem('american_iron_draft', JSON.stringify(draftData));
+      localStorage.setItem(key, JSON.stringify(draftData));
       setHasDraft(true);
+      alert("Draft saved for current user session.");
     } catch (e) {
       alert("Could not save draft.");
     }
@@ -160,7 +191,8 @@ const App: React.FC = () => {
 
   const handleResumeDraft = () => {
     try {
-      const draft = localStorage.getItem('american_iron_draft');
+      const key = getStorageKey('american_iron_draft');
+      const draft = localStorage.getItem(key);
       if (draft) {
         const json = JSON.parse(draft);
         if (json.items) setItems(json.items);
@@ -175,8 +207,12 @@ const App: React.FC = () => {
     setConfig(prev => ({ ...prev, quoteId: generateDocumentId(prev.isInvoice) }));
   }, []);
 
+  if (!user) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
-    <div className="min-h-screen pb-20 print:min-h-0 print:pb-0 print:bg-white">
+    <div className="min-h-screen pb-20 print:min-h-0 print:pb-0 print:bg-white fade-in">
       <ConfigPanel 
         onDataLoaded={handleDataLoaded}
         onConfigChange={setConfig}
@@ -198,6 +234,8 @@ const App: React.FC = () => {
         addressBook={addressBook}
         onSaveToBook={handleSaveToBook}
         onDeleteFromBook={handleDeleteFromBook}
+        currentUser={user}
+        onLogout={handleLogout}
       />
       
       <div ref={resultRef}>
