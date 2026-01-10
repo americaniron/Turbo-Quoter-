@@ -40,7 +40,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 relative overflow-hidden">
-      {/* Background elements */}
       <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none overflow-hidden">
          <div className="absolute -top-1/4 -left-1/4 w-full h-full bg-[#ffcd00] rounded-full blur-[200px]"></div>
          <div className="absolute -bottom-1/4 -right-1/4 w-full h-full bg-indigo-600 rounded-full blur-[200px]"></div>
@@ -48,11 +47,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
       <div className="w-full max-w-md relative z-10 fade-in">
         <div className="flex flex-col items-center mb-10">
-          <div className="bg-slate-900/50 p-6 rounded-[2.5rem] border-2 border-slate-800 shadow-2xl mb-6">
-            <Logo className="h-24 w-auto object-contain" />
+          <div className="bg-slate-900/80 p-8 rounded-[3rem] border-2 border-slate-800 shadow-2xl mb-6">
+            <Logo className="h-32 w-auto object-contain" />
           </div>
           <h1 className="text-3xl font-black text-white uppercase tracking-[0.2em] italic">Engineering Portal</h1>
-          <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.5em] mt-2">Authorized Access Only</p>
+          <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.5em] mt-2 text-center">American Iron Logistics & Supply Hub</p>
         </div>
 
         <div className="bg-slate-900/40 backdrop-blur-2xl p-10 rounded-[3rem] border border-white/10 shadow-2xl">
@@ -96,7 +95,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <div className="w-5 h-5 border-3 border-slate-900/30 border-t-slate-900 rounded-full animate-spin"></div>
               ) : (
                 <>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3 3H6a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
                   Authorize Entry
                 </>
               )}

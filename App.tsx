@@ -10,7 +10,7 @@ const generateDocumentId = (isInvoice: boolean) => {
   const prefix = isInvoice ? 'INV' : 'QT';
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const randomHex = Math.floor(Math.random() * 0x10000).toString(16).toUpperCase().padStart(4, '0');
-  return `AI-${prefix}-${dateStr}-${randomHex}`;
+  return `${prefix}-${dateStr}-${randomHex}`;
 };
 
 const App: React.FC = () => {
@@ -47,6 +47,7 @@ const App: React.FC = () => {
     logisticsRate: 2.50,
     isInvoice: false,
     weightUnit: 'LBS',
+    includeAiAnalysis: false,
     shippingCompany: '',
     shippingPhone: '',
     shippingAddress: '',
@@ -56,7 +57,7 @@ const App: React.FC = () => {
     shippingCountry: 'United States'
   });
   
-  const [aiEnabled, setAiEnabled] = useState(true);
+  const [aiEnabled, setAiEnabled] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
@@ -64,10 +65,8 @@ const App: React.FC = () => {
   
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // User-specific storage keys
   const getStorageKey = (base: string) => user ? `${base}_${user.username}` : base;
 
-  // Persistence management
   useEffect(() => {
     if (!user) return;
 
@@ -85,12 +84,10 @@ const App: React.FC = () => {
         setAddressBook([]);
     }
     
-    // Reset view state on login
     setItems([]);
     setAiAnalysis(null);
   }, [user]);
 
-  // Save address book whenever it changes (user-namespaced)
   useEffect(() => {
     if (user) {
       localStorage.setItem(getStorageKey('american_iron_address_book'), JSON.stringify(addressBook));
@@ -119,9 +116,14 @@ const App: React.FC = () => {
   const handleAnalyze = async () => {
     if (items.length === 0) return;
     setIsAnalyzing(true);
-    const result = await analyzeQuoteData(items);
-    setAiAnalysis(result);
-    setIsAnalyzing(false);
+    try {
+        const result = await analyzeQuoteData(items);
+        setAiAnalysis(result);
+    } catch (err) {
+        setAiAnalysis("Analysis failed. Hub offline or rate limited.");
+    } finally {
+        setIsAnalyzing(false);
+    }
   };
 
   const handleSaveToBook = (newClient: ClientInfo) => {
@@ -143,16 +145,32 @@ const App: React.FC = () => {
   };
 
   const handleSaveQuote = () => {
-    const data = { version: '1.5', author: user?.username, timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const dateStr = new Date().toISOString().split('T')[0];
-    link.download = `${config.isInvoice ? 'INVOICE' : 'QUOTE'}-${config.quoteId.replace(/[^a-z0-9]/gi, '_')}-${dateStr}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (items.length === 0) {
+        alert("No items to export.");
+        return;
+    }
+
+    try {
+        const data = { version: '1.6', author: user?.username, timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const dateStr = new Date().toISOString().split('T')[0];
+        const fileName = `${config.isInvoice ? 'INVOICE' : 'QUOTE'}-${config.quoteId.replace(/[^a-z0-9]/gi, '_')}-${dateStr}.json`;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        setTimeout(() => {
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }, 100);
+    } catch (err: any) {
+        alert("Export Error: " + err.message);
+    }
   };
 
   const handleLoadQuote = (file: File) => {
@@ -167,7 +185,7 @@ const App: React.FC = () => {
         setAiAnalysis(json.aiAnalysis || null);
         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       } catch (err) {
-        alert("Failed to load quote file.");
+        alert("Failed to load JSON file. File may be corrupted or incompatible.");
       }
     };
     reader.readAsText(file);
@@ -183,9 +201,9 @@ const App: React.FC = () => {
       if (options.config) draftData.config = config;
       localStorage.setItem(key, JSON.stringify(draftData));
       setHasDraft(true);
-      alert("Draft saved for current user session.");
+      alert("Local draft updated.");
     } catch (e) {
-      alert("Could not save draft.");
+      alert("Draft save failed.");
     }
   };
 
@@ -214,6 +232,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen pb-20 print:min-h-0 print:pb-0 print:bg-white fade-in">
       <ConfigPanel 
+        itemsCount={items.length}
         onDataLoaded={handleDataLoaded}
         onConfigChange={setConfig}
         onClientChange={setClient}
@@ -238,7 +257,7 @@ const App: React.FC = () => {
         onLogout={handleLogout}
       />
       
-      <div ref={resultRef}>
+      <div ref={resultRef} className="quote-preview-container">
         <QuotePreview 
             items={items} 
             client={client} 

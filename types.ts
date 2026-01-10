@@ -40,6 +40,7 @@ export interface AppConfig {
   logisticsRate: number;
   isInvoice: boolean;
   weightUnit: 'LBS' | 'KG';
+  includeAiAnalysis: boolean; // New toggle for AI Brainstorming visibility
   paymentTerms?: string;
   specialInstructions?: string;
   shippingCompany?: string;

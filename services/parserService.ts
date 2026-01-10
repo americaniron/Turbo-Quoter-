@@ -1,12 +1,10 @@
 
 import { QuoteItem } from '../types.ts';
-import { parseDocumentWithAI } from './geminiService.ts';
 
 // --- Helper Functions ---
 
 /**
  * Extracts availability information from the text line.
- * Returns the availability string and the text with availability removed.
  */
 function extractAvailability(text: string): { availability: string, remainingText: string } {
     const availPatterns = [
@@ -14,9 +12,8 @@ function extractAvailability(text: string): { availability: string, remainingTex
         /All\s+\d+\s+by\s+\d{1,2}\/\d{1,2}\/\d{2,4}/i,
         /\d+\s+in\s+stock/i,
         /\bIn\s+Stock\b/i,
-        /Factory\s+Stock/i,
+        /Contact\s+Dealer/i,
         /Backorder/i,
-        /Subject\s+to\s+availability/i,
         /Lead\s+Time[:\s]+\d+\s+Days/i
     ];
 
@@ -37,35 +34,47 @@ function extractAvailability(text: string): { availability: string, remainingTex
 
 /**
  * Clean string to remove generic labels and ensure only item details remain.
- * UPDATED: Aggressively removes 3rd party dealer info.
  */
 function cleanDescription(text: string): string {
   if (!text) return "CAT COMPONENT";
   
   let cleaned = String(text)
-    // STRICT PRIVACY FILTER: Remove known 3rd party dealers and locations
+    // Remove Company/Contact Info
     .replace(/Ring Power|RING POWER CORPORATION|Tampa|Riverview|Fern Hill|025069|ADAM qadah|adam@americanyellowiron\.com/gi, "")
     .replace(/10421 Fern Hill Dr\.|813-671-3700|33578|United States|Florida/gi, "")
-    // Layout and Admin Noise
-    .replace(/Order Information|Pickup Location|Pickup Method|SUMMARY OF CHARGES|Items In Your Order|Page \d+ of \d+|Invoice No|Document Date/gi, "")
-    .replace(/\b(Unit Price|Extended Price|Total Price|Product Description|Line Item|Availability)\b/gi, "")
-    .replace(/SHIPPING\/MISCELLANEOUS|TOTAL TAX|ORDER TOTAL|SUBTOTAL|\(USD\)|USD|TAX:|Credit Card|Billing Address/gi, "")
-    .replace(/\$\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g, "")
+    // Remove Page Sections & Summary Headers
+    .replace(/Order Information|Pickup Location|Pickup Method|SUMMARY OF CHARGES|Items In Your Order|Page \d+ of \d+/gi, "")
+    // Remove Table Headers
+    .replace(/\b(Unit Price|Extended Price|Total Price|Product Description|Line Item|Availability|Notes|Quantity)\b/gi, "")
+    // Remove Summary Labels aggressively
+    .replace(/ORDER SUBTOTAL|Shipping\/Miscellaneous|Total Tax|ORDER TOTAL|Contact Dealer/gi, "")
+    .replace(/\(USD\)/g, "")
+    // Remove specific part-row boilerplate
     .replace(/Non-returnable part/gi, "")
-    .replace(/["']/g, "")
+    .replace(/Line item note:/gi, "")
+    .replace(/Replaces Part # \(.+?\)/gi, "")
+    // Remove trailing/orphaned prices
+    .replace(/[\$]?[0-9,]+\.[0-9]{2}\s+(?:ea\.?|USD)/gi, "")
+    .replace(/[\$]?[0-9,]+\.[0-9]{2}/g, "")
+    // Clean up characters
+    .replace(/[:]/g, " ")
     .trim();
 
-  cleaned = cleaned.replace(/^(?:\d{1,4}\s*[:.)-]\s*)+/, "");
-  cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
+  // Remove leading item numbers like "1) 1"
+  cleaned = cleaned.replace(/^(?:\d+[\s)]+)+/, "");
+  // Remove leading whitespace/dashes
+  cleaned = cleaned.replace(/^[\s-]+/, "");
   
-  return cleaned;
+  // Final check to see if the description contains a summary label accidentally
+  if (cleaned.match(/ORDER TOTAL|SUBTOTAL|TAX/i)) {
+      cleaned = cleaned.split(/ORDER TOTAL|SUBTOTAL|TAX/i)[0];
+  }
+  
+  return cleaned.replace(/\s{2,}/g, " ").trim() || "CAT COMPONENT";
 }
 
-/**
- * Extract weight and normalize to LBS.
- */
 function extractWeight(text: string): number {
-  const m = String(text).match(/(\d{1,4}(?:\.\d+)?)\s*(lb|lbs|1bs|kg|kgs|kilogram|kilograms|k\.g\.)\b/i);
+  const m = String(text).match(/(\d+(?:\.\d+)?)\s*(lb|lbs|1bs|kg|kgs|kilogram|k\.g\.)\b/i);
   if (!m) return 0;
   
   const val = parseFloat(m[1]);
@@ -78,40 +87,27 @@ function extractWeight(text: string): number {
   return val;
 }
 
-/**
- * Price Extraction Logic
- */
 function determineCorrectPrice(text: string, qty: number): number {
     const matches = [...text.matchAll(/\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g)];
     let prices = matches.map(m => parseFloat(m[1].replace(/,/g, "")));
     prices = prices.filter(p => p > 0.01);
-    prices = [...new Set(prices)];
-    prices.sort((a, b) => b - a);
-
+    
     if (prices.length === 0) return 0;
 
-    const explicitUnitMatch = text.match(/(@|ea\.?|each)\s*\$?(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/i) 
-                           || text.match(/\$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*(ea|each|@)/i);
-    
-    if (explicitUnitMatch) {
-        const valStr = explicitUnitMatch[1].match(/\d/) ? explicitUnitMatch[1] : explicitUnitMatch[2];
-        const val = parseFloat(valStr.replace(/,/g, ""));
-        if (prices.some(p => Math.abs(p - val) < 0.01)) {
-            return val;
-        }
+    const eaMatch = text.match(/\$?([0-9,]+\.[0-9]{2})\s+ea\.?/i);
+    if (eaMatch) {
+        return parseFloat(eaMatch[1].replace(/,/g, ""));
     }
 
-    if (qty === 1) return prices[0];
-
     if (qty > 1) {
-        for (let i = 0; i < prices.length; i++) {
-            const potentialTotal = prices[i];
-            const unitMatch = prices.find(p => Math.abs((p * qty) - potentialTotal) < 0.1); 
-            if (unitMatch) {
-                return unitMatch;
+        for (let p1 of prices) {
+            for (let p2 of prices) {
+                if (p1 === p2) continue;
+                if (Math.abs(p1 * qty - p2) < 0.1) return p1;
+                if (Math.abs(p2 * qty - p1) < 0.1) return p2;
             }
         }
-        return prices[0];
+        return Math.min(...prices);
     }
 
     return prices[0];
@@ -122,187 +118,61 @@ function multiplyMatrix(m1: number[], m2: number[]): number[] {
         m1[0] * m2[0] + m1[2] * m2[1],
         m1[1] * m2[0] + m1[3] * m2[1],
         m1[0] * m2[2] + m1[2] * m2[3],
-        m1[1] * m2[2] + m1[3] * m2[3],
+        m1[1] * m2[3] + m1[3] * m2[3],
         m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
         m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
     ];
 }
 
 export const parseTextData = (text: string): QuoteItem[] => {
-  const raw = String(text || "");
-  let items: QuoteItem[] = [];
-
-  const lineStartRegex = /(?:^|\n)\s*(\d+)\)\s+/g;
-  const lineMatches = [...raw.matchAll(lineStartRegex)];
-
-  if (lineMatches.length > 0) {
-      for (let i = 0; i < lineMatches.length; i++) {
-          const start = lineMatches[i].index!;
-          const end = (i + 1 < lineMatches.length) ? lineMatches[i+1].index! : raw.length;
-          const block = raw.substring(start, end);
-          
-          let qty = 1;
-          const currentLineNum = lineMatches[i][1];
-          const qtyMatch = block.match(new RegExp(`(?:^|\\n)\\s*${currentLineNum}\\)\\s+(\\d+)`));
-          if (qtyMatch) {
-              qty = parseInt(qtyMatch[1]);
-          }
-
-          let unitPrice = determineCorrectPrice(block, qty);
-          if (unitPrice === 0) continue; 
-
-          const weight = extractWeight(block);
-          const { availability, remainingText } = extractAvailability(block);
-
-          const partPattern = /(?:\b[0-9A-Z]{1,5}-[0-9A-Z]{3,7}\b|\b[0-9]{5,8}\b(?=\s*:?|[A-Z]))/i;
-          const partMatch = remainingText.match(partPattern);
-          let partNo = "";
-          
-          if (partMatch) {
-               if (!/^\d{1,4}$/.test(partMatch[0])) {
-                   partNo = partMatch[0];
-               }
-          }
-          if (!partNo) {
-               const colonMatch = remainingText.match(/([A-Z0-9\-]{5,12}):/);
-               if (colonMatch) partNo = colonMatch[1];
-          }
-          if (partNo.endsWith("-")) partNo = partNo.slice(0, -1);
-          if (!partNo) partNo = `ITEM-${i+1}`;
-
-          let desc = cleanDescription(remainingText);
-          if (partNo && partNo !== `ITEM-${i+1}` && desc.includes(partNo)) {
-              const parts = desc.split(partNo);
-              if (parts.length > 1) desc = parts.slice(1).join(" ");
-          }
-          
-          desc = desc.replace(/^[:\s-]+/g, "").replace(/\s+/g, " ").trim();
-          if (!desc) desc = "CAT COMPONENT";
-
-          items.push({ qty, partNo, desc, weight, unitPrice, availability });
-      }
-      return items;
-  }
-  return items;
+    const lines = text.split('\n');
+    const items: QuoteItem[] = [];
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const m = trimmed.match(/^(\d+)\s+([A-Z0-9-]+)\s+(.+?)\s+\$?([0-9,]+\.[0-9]{2})/i);
+        if (m) {
+            items.push({
+                qty: parseInt(m[1]),
+                partNo: m[2],
+                desc: cleanDescription(m[3]),
+                weight: extractWeight(trimmed),
+                unitPrice: parseFloat(m[4].replace(/,/g, '')),
+                availability: extractAvailability(trimmed).availability
+            });
+        }
+    }
+    return items;
 };
 
 export const parseExcelFile = async (file: File): Promise<QuoteItem[]> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const wb = window.XLSX.read(data, { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[][] = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-
-        if (!rows || rows.length === 0) {
-          resolve([]);
-          return;
-        }
-
-        let headerIdx = -1;
-        const colMap = { qty: -1, part: -1, desc: -1, price: -1, weight: -1, avail: -1 };
-        const terms = {
-            part: ['part', 'number', 'item', 'sku', 'pn', 'material'],
-            desc: ['description', 'desc', 'product', 'name', 'details'],
-            qty: ['qty', 'quantity', 'count', 'pcs'],
-            price: ['price', 'unit', 'cost', 'rate', 'ea'],
-            weight: ['weight', 'wt', 'lbs', 'kg'],
-            avail: ['avail', 'stock', 'status', 'due']
-        };
-
-        const normalize = (s: any) => String(s).toLowerCase().replace(/[^a-z]/g, '');
-
-        for (let i = 0; i < Math.min(rows.length, 25); i++) {
-            const row = rows[i];
-            let matches = 0;
-            const cells = row.map(normalize);
-            if (cells.some(c => terms.part.some(t => c.includes(t)))) matches++;
-            if (cells.some(c => terms.price.some(t => c.includes(t)))) matches++;
-            if (matches >= 2) {
-                headerIdx = i;
-                row.forEach((cellRaw: any, idx: number) => {
-                    const cell = normalize(cellRaw);
-                    if (terms.qty.some(t => cell.includes(t))) colMap.qty = idx;
-                    else if (terms.price.some(t => cell.includes(t)) && !cell.includes('total')) colMap.price = idx;
-                    else if (terms.part.some(t => cell.includes(t))) colMap.part = idx;
-                    else if (terms.desc.some(t => cell.includes(t))) colMap.desc = idx;
-                    else if (terms.weight.some(t => cell.includes(t))) colMap.weight = idx;
-                    else if (terms.avail.some(t => cell.includes(t))) colMap.avail = idx;
-                });
-                break;
-            }
-        }
-
-        const items: QuoteItem[] = [];
-        const startRow = headerIdx === -1 ? 0 : headerIdx + 1;
-
-        for (let i = startRow; i < rows.length; i++) {
-            const row = rows[i];
-            if (!row || row.length === 0) continue;
-            const getVal = (idx: number) => (idx > -1 && row[idx] !== undefined) ? row[idx] : null;
-
-            let qty = 1;
-            const rawQty = getVal(colMap.qty);
-            if (rawQty !== null) {
-                const q = parseInt(String(rawQty).replace(/[^0-9]/g, ''));
-                if (q > 0) qty = q;
-            }
-
-            let unitPrice = 0;
-            const rawPrice = getVal(colMap.price);
-            if (rawPrice !== null) {
-                if (typeof rawPrice === 'number') unitPrice = rawPrice;
-                else {
-                    const p = parseFloat(String(rawPrice).replace(/[^0-9.]/g, ''));
-                    if (!isNaN(p)) unitPrice = p;
-                }
-            }
-
-            let partNo = "CAT-PART";
-            const rawPart = getVal(colMap.part);
-            if (rawPart) partNo = String(rawPart).trim();
-
-            let desc = "CAT COMPONENT";
-            const rawDesc = getVal(colMap.desc);
-            if (rawDesc) desc = cleanDescription(String(rawDesc));
-
-            let weight = 0;
-            const rawWeight = getVal(colMap.weight);
-            if (rawWeight) weight = extractWeight(String(rawWeight));
-            
-            let availability = "";
-            const rawAvail = getVal(colMap.avail);
-            if (rawAvail) availability = String(rawAvail).trim();
-
-            if (unitPrice > 0) {
-                items.push({ qty, partNo, desc, weight, unitPrice, availability });
-            }
-        }
-        resolve(items);
-      } catch (err) {
-        reject(err);
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  });
+    const data = await file.arrayBuffer();
+    const workbook = window.XLSX.read(data, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    const jsonData = window.XLSX.utils.sheet_to_json(worksheet);
+    return jsonData.map((row: any) => ({
+        qty: Number(row.qty || row.Quantity || 1),
+        partNo: String(row.partNo || row.Part || row.Item || ""),
+        desc: cleanDescription(String(row.desc || row.Description || "Part Description")),
+        weight: Number(row.weight || row.Weight || 0),
+        unitPrice: Number(row.unitPrice || row.Price || 0),
+        availability: String(row.availability || "")
+    })).filter(item => item.partNo);
 };
 
 export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  
-  let allRowObjects: { text: string, images: string[] }[] = [];
+  let allRows: { text: string, images: string[], y: number, page: number }[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
-    const pageImages: { y: number, base64: string }[] = [];
-    
+    const pageImages: { y: number, x: number, base64: string, w: number, h: number }[] = [];
     try {
         const ops = await page.getOperatorList();
-        const commonObjs = page.commonObjs;
         const objs = page.objs;
+        const commonObjs = page.commonObjs;
         let currentMatrix = [1, 0, 0, 1, 0, 0];
         const matrixStack: number[][] = [];
 
@@ -314,137 +184,120 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
             else if (fn === window.pdfjsLib.OPS.transform) currentMatrix = multiplyMatrix(currentMatrix, args);
             else if (fn === window.pdfjsLib.OPS.paintImageXObject) {
                 const imgName = args[0];
-                try {
-                    let imgObj = await objs.get(imgName).catch(() => null);
-                    if (!imgObj && commonObjs) imgObj = await commonObjs.get(imgName).catch(() => null);
-                    if (imgObj && (imgObj.data || imgObj.bitmap)) {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = imgObj.width;
-                        canvas.height = imgObj.height;
-                        const ctx = canvas.getContext('2d');
-                        if (imgObj.bitmap) ctx?.drawImage(imgObj.bitmap, 0, 0);
-                        else if (imgObj.data) {
-                             const array = new Uint8ClampedArray(imgObj.data);
-                             const imgData = new ImageData(array, imgObj.width, imgObj.height);
-                             ctx?.putImageData(imgData, 0, 0);
-                        }
-                        if (canvas.width > 0 && canvas.height > 0) {
-                            pageImages.push({ y: currentMatrix[5], base64: canvas.toDataURL('image/jpeg', 0.8) });
-                        }
+                let imgObj = await objs.get(imgName).catch(() => null);
+                if (!imgObj && commonObjs) imgObj = await commonObjs.get(imgName).catch(() => null);
+                if (imgObj && imgObj.width > 25) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = imgObj.width;
+                    canvas.height = imgObj.height;
+                    const ctx = canvas.getContext('2d');
+                    if (imgObj.bitmap) ctx?.drawImage(imgObj.bitmap, 0, 0);
+                    else if (imgObj.data) {
+                        const imgData = new ImageData(new Uint8ClampedArray(imgObj.data), imgObj.width, imgObj.height);
+                        ctx?.putImageData(imgData, 0, 0);
                     }
-                } catch (err) {}
+                    if (currentMatrix[4] > 40 && currentMatrix[4] < 550) {
+                        pageImages.push({ y: currentMatrix[5], x: currentMatrix[4], base64: canvas.toDataURL('image/jpeg', 0.8), w: imgObj.width, h: imgObj.height });
+                    }
+                }
             }
         }
     } catch (e) {}
     
     const content = await page.getTextContent();
-    const items = content.items
-      .map((item: any) => ({
-        str: item.str,
-        x: item.transform[4],
-        y: item.transform[5],
-        width: item.width || 0,
-        height: item.height || 10
-      }))
-      .filter((item: any) => item.str.trim().length > 0);
-
-    items.sort((a: any, b: any) => b.y - a.y);
-
-    const rows: any[][] = [];
-    if (items.length > 0) {
-        let currentRow = [items[0]];
-        for (let j = 1; j < items.length; j++) {
-            const item = items[j];
-            const prevItem = currentRow[0];
-            if (Math.abs(item.y - prevItem.y) < (prevItem.height * 0.6)) currentRow.push(item);
-            else { rows.push(currentRow); currentRow = [item]; }
+    const textItems = content.items.map((item: any) => ({ str: item.str, x: item.transform[4], y: item.transform[5] }));
+    textItems.sort((a, b) => b.y - a.y);
+    const rowGroups: any[][] = [];
+    if (textItems.length > 0) {
+        let cur = [textItems[0]];
+        for (let j = 1; j < textItems.length; j++) {
+            if (Math.abs(textItems[j].y - cur[0].y) < 8) cur.push(textItems[j]);
+            else { rowGroups.push(cur); cur = [textItems[j]]; }
         }
-        rows.push(currentRow);
+        rowGroups.push(cur);
     }
-
-    const pageRows = rows.map(row => {
-        row.sort((a, b) => a.x - b.x);
-        const text = row.map(r => r.str).join(" ").trim();
-        const rowY = row[0].y; 
-        const linkedImages = pageImages.filter(img => Math.abs(img.y - rowY) < 60).map(img => img.base64);
-        return { text, images: linkedImages };
+    const pageRows = rowGroups.map(group => {
+        group.sort((a, b) => a.x - b.x);
+        const y = group[0].y;
+        const text = group.map(g => g.str).join(" ").trim();
+        const linked = pageImages.filter(img => Math.abs(img.y - y) < 45).sort((a, b) => a.x - b.x).map(img => img.base64);
+        return { text, images: linked, y, page: i };
     });
-
-    allRowObjects = [...allRowObjects, ...pageRows];
+    allRows = [...allRows, ...pageRows];
   }
   
-  const parsedItems: QuoteItem[] = [];
-  let currentItem: Partial<QuoteItem> & { rawText: string, attachedImages: string[] } | null = null;
-  const startPattern = /^(?:(\d+)\)\s+\d+|(?:[0-9A-Z]{2,5}-[0-9A-Z]{3,7})|(?:[0-9]{6,8}))\b/i;
-
-  const finalizeItem = (item: any) => {
-     if (!item) return;
-     let qty = 1;
-     const lineQty = item.rawText.match(/^\d+\)\s+(\d+)/);
-     const pMatchStart = item.rawText.match(/(?:\b[0-9A-Z]{1,5}-[0-9A-Z]{3,7}\b|\b[0-9]{5,8}\b)/i);
-     if (lineQty) qty = parseInt(lineQty[1]);
-     else if (pMatchStart) {
-         const pNoStr = pMatchStart[0];
-         const escP = pNoStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-         const qm = item.rawText.match(new RegExp(`(\\d+)\\s+(?=${escP})`, 'i'));
-         if (qm) qty = parseInt(qm[1]);
-     }
-     let uPrice = determineCorrectPrice(item.rawText, qty);
-     if (uPrice === 0) return; 
-
-     const weight = extractWeight(item.rawText);
-     const { availability, remainingText } = extractAvailability(item.rawText);
-
-     let pNo = "";
-     const pMatch = remainingText.match(/(?:\b[0-9A-Z]{1,5}-[0-9A-Z]{3,7}\b|\b[0-9]{5,8}\b)/i);
-     if (pMatch && !/^\d{1,4}$/.test(pMatch[0])) pNo = pMatch[0];
-     if (!pNo) pNo = "ITEM";
-
-     let desc = cleanDescription(remainingText);
-     if (pNo && pNo !== "ITEM" && desc.includes(pNo)) {
-         const parts = desc.split(pNo);
-         if (parts.length > 1) desc = parts.slice(1).join(" ");
-     }
-     desc = desc.replace(/^[:\s-]+/g, "").replace(/\s+/g, " ").trim();
-     if (!desc) desc = "CAT COMPONENT";
-     
-     parsedItems.push({
-         qty,
-         partNo: pNo,
-         desc,
-         weight,
-         unitPrice: uPrice,
-         originalImages: item.attachedImages || [],
-         availability
-     });
-  };
-
+  const items: QuoteItem[] = [];
+  let curItem: { text: string, imgs: string[] } | null = null;
   let inItemSection = false;
-  for (const rowObj of allRowObjects) {
-      const rowText = rowObj.text;
-      if (!rowText) continue;
-      if (rowText.match(/Items In Your Order/i)) { inItemSection = true; continue; }
-      if (rowText.match(/Summary of Charges|Order Total|Subtotal/i)) inItemSection = false;
-      if (rowText.match(/^Page \d/i) || rowText.match(/Invoice|Ship To|Bill To|Sold To|P\.O\.|Date:|Terms:|Due Date/i)) continue;
 
-      const isStartPattern = startPattern.test(rowText);
-      if (!inItemSection && isStartPattern && rowText.match(/^\d+\)\s+\d+/)) inItemSection = true;
+  for (const row of allRows) {
+      const cleanRow = row.text.trim();
+      if (!cleanRow) continue;
 
-      if (inItemSection && isStartPattern) {
-          if (currentItem) finalizeItem(currentItem);
-          currentItem = { rawText: rowText, attachedImages: rowObj.images };
-      } else if (inItemSection || currentItem) {
-          if (currentItem) {
-              if (/[a-zA-Z0-9]/.test(rowText)) {
-                  currentItem.rawText += " " + rowText;
-                  if (rowObj.images.length > 0) {
-                      const newImages = rowObj.images.filter(img => !currentItem!.attachedImages.includes(img));
-                      currentItem.attachedImages = [...currentItem.attachedImages, ...newImages];
-                  }
+      if (cleanRow.match(/Items In Your Order/i)) {
+          inItemSection = true;
+          continue;
+      }
+      
+      if (cleanRow.match(/SUMMARY OF CHARGES|ORDER SUBTOTAL|Shipping\/Miscellaneous|Total Tax|ORDER TOTAL|Page \d+ of \d+/i)) {
+          if (curItem) {
+              const flushed = flushItem(curItem);
+              if (flushed) items.push(flushed);
+              curItem = null;
+          }
+          inItemSection = false;
+          continue;
+      }
+
+      if (inItemSection) {
+          const itemMatch = cleanRow.match(/^(\d+\)\s+)?(\d+)\s+([A-Z0-9-]+)\b/i);
+          if (itemMatch) {
+              if (curItem) {
+                  const flushed = flushItem(curItem);
+                  if (flushed) items.push(flushed);
               }
+              curItem = { text: cleanRow, imgs: row.images };
+          } else if (curItem) {
+              // Extra safety: stop appending if current line looks like summary footer
+              if (cleanRow.match(/ORDER SUBTOTAL|Shipping\/Miscellaneous|Total Tax|ORDER TOTAL/gi)) {
+                   if (curItem) {
+                      const flushed = flushItem(curItem);
+                      if (flushed) items.push(flushed);
+                      curItem = null;
+                   }
+                   inItemSection = false;
+                   continue;
+              }
+              curItem.text += " " + cleanRow;
+              curItem.imgs = [...curItem.imgs, ...row.images];
           }
       }
   }
-  if (currentItem) finalizeItem(currentItem);
-  return parsedItems.length > 0 ? parsedItems : await parseDocumentWithAI(allRowObjects.map(r => r.text).join("\n"));
+
+  if (curItem) {
+      const flushed = flushItem(curItem);
+      if (flushed) items.push(flushed);
+  }
+
+  return items;
 };
+
+function flushItem(curItem: { text: string, imgs: string[] }): QuoteItem | null {
+    const m = curItem.text.match(/^(\d+\)\s+)?(\d+)\s+([A-Z0-9-]+)\b/i);
+    if (!m) return null;
+    
+    const qty = parseInt(m[2]);
+    const partNo = m[3];
+    const { availability, remainingText } = extractAvailability(curItem.text);
+    const price = determineCorrectPrice(remainingText, qty);
+    
+    return {
+        qty,
+        partNo,
+        desc: cleanDescription(remainingText),
+        weight: extractWeight(remainingText),
+        unitPrice: price,
+        availability,
+        originalImages: curItem.imgs
+    };
+}
