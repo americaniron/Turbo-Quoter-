@@ -87,8 +87,7 @@ export const parseTextData = (text: string): QuoteItem[] => {
   const lines = text.split('\n');
   const items: QuoteItem[] = [];
   
-  // Paste Mode Regex: "1) 1 123-456: Desc"
-  const lineRegex = /(?:^|\s)(?:(\d+)[\)\.]?\s+)?(\d+)\s+([A-Z0-9\.\/-]{3,20})(?::|\s+|$)(.+?)(?:\s+\$?([0-9,]+\.[0-9]{2}))?$/i;
+  const lineRegex = /(?:^|\s)(?:(\d+)[\)\.]?\s+)?(\d+)\s+([A-Z0-9\.\/-]{3,20})(?::|\s+|$)(.+)$/i;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -97,13 +96,27 @@ export const parseTextData = (text: string): QuoteItem[] => {
     if (m) {
       if (isDateString(m[3])) continue;
 
+      const qty = parseInt(m[2]);
+      const restOfLine = m[4] || "";
+
+      let unitPrice = 0;
+      const unitPriceMatch = restOfLine.match(/\$([0-9,]+\.[0-9]{2})\s*ea/i);
+      const allPriceMatches = Array.from(restOfLine.matchAll(/\$([0-9,]+\.[0-9]{2})/g));
+
+      if (unitPriceMatch) {
+          unitPrice = parseFloat(unitPriceMatch[1].replace(/,/g, ''));
+      } else if (allPriceMatches.length > 0 && qty > 0) {
+          const lineTotal = parseFloat(allPriceMatches[0][1].replace(/,/g, ''));
+          unitPrice = lineTotal / qty;
+      }
+
       items.push({
         lineNo: m[1],
-        qty: parseInt(m[2]),
+        qty: qty,
         partNo: m[3],
-        desc: cleanDescription(m[4] || "CAT COMPONENT"),
+        desc: cleanDescription(restOfLine.replace(/\$[0-9,.]+/g, '').replace(/ea\./ig, '')),
         weight: extractWeight(trimmed),
-        unitPrice: m[5] ? parseFloat(m[5].replace(/,/g, '')) : 0,
+        unitPrice: unitPrice,
         availability: extractAvailability(trimmed).availability,
         originalImages: []
       });
@@ -148,13 +161,11 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
 
-    // Group text items by Y coordinate with tolerance
     const linesMap = new Map<number, any[]>();
     
     textContent.items.forEach((item: any) => {
       if (!item || !item.transform) return;
       const y = Math.round(item.transform[5]);
-      // Tolerance of 4 units handles slight misalignment
       let matchY: number | undefined;
       for (const key of linesMap.keys()) {
         if (Math.abs(key - y) <= 4) { 
@@ -178,50 +189,12 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
       };
     }).filter(l => l.text.length > 0);
 
-    // Extract images
-    const extractedImages: { data: string, y: number }[] = [];
-    try {
-      const ops = await page.getOperatorList();
-      let currentTransform = [1, 0, 0, 1, 0, 0];
-      const OPS = window.pdfjsLib.OPS;
-      if (OPS) {
-          for (let j = 0; j < ops.fnArray.length; j++) {
-            const fn = ops.fnArray[j];
-            const args = ops.argsArray[j];
-            if (fn === OPS.transform) currentTransform = args;
-            if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject) {
-              const imgKey = args[0];
-              try {
-                const img = await page.objs.get(imgKey);
-                if (img && img.data) {
-                   const canvas = document.createElement('canvas');
-                   canvas.width = img.width;
-                   canvas.height = img.height;
-                   const ctx = canvas.getContext('2d');
-                   if (ctx) {
-                     const imageData = ctx.createImageData(img.width, img.height);
-                     imageData.data.set(img.data);
-                     ctx.putImageData(imageData, 0, 0);
-                     extractedImages.push({
-                       data: canvas.toDataURL('image/jpeg', 0.8),
-                       y: currentTransform[5]
-                     });
-                   }
-                }
-              } catch (e) {}
-            }
-          }
-      }
-    } catch (e) {}
-
-    // State Machine Parser
     const itemStartRegex = /^\s*(\d+)[\)\.]\s+(\d+)\s+([A-Z0-9\-\.:]+)(.*)$/i;
     let currentItem: QuoteItem | null = null;
     let currentY = 0;
 
     for (const lineObj of textLines) {
       const text = lineObj.text;
-      // aggressively skip third party headers
       if (text.match(/SUMMARY OF CHARGES|ORDER TOTAL|SUBTOTAL|TAX|PAGE|INVOICE|QUOTATION|RING POWER|Payment Information/i)) {
         if (currentItem) { items.push(currentItem); currentItem = null; }
         continue;
@@ -229,32 +202,37 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
 
       const startMatch = text.match(itemStartRegex);
       
-      // Start of new item
       if (startMatch && !isDateString(startMatch[3])) {
         if (currentItem) items.push(currentItem);
 
         const rawPart = startMatch[3].replace(/:$/, '');
         const initialDesc = cleanDescription(startMatch[4]);
+        const qty = parseInt(startMatch[2]);
+        
+        let unitPrice = 0;
+        const unitPriceMatch = text.match(/\$([0-9,]+\.[0-9]{2})\s*ea/i);
+        const allPriceMatches = Array.from(text.matchAll(/\$([0-9,]+\.[0-9]{2})/g));
+
+        if (unitPriceMatch) {
+            unitPrice = parseFloat(unitPriceMatch[1].replace(/,/g, ''));
+        } else if (allPriceMatches.length > 0 && qty > 0) {
+            const lineTotal = parseFloat(allPriceMatches[0][1].replace(/,/g, ''));
+            unitPrice = lineTotal / qty;
+        }
         
         currentItem = {
            lineNo: startMatch[1],
-           qty: parseInt(startMatch[2]),
+           qty: qty,
            partNo: rawPart,
            desc: initialDesc || "CAT COMPONENT",
            weight: extractWeight(text),
-           unitPrice: 0,
+           unitPrice: unitPrice,
            availability: extractAvailability(text).availability,
            notes: '',
            originalImages: []
         };
         currentY = lineObj.y;
-
-        const priceMatch = text.match(/\$([0-9,]+\.[0-9]{2})/);
-        if (priceMatch) {
-            currentItem.unitPrice = parseFloat(priceMatch[1].replace(/,/g, ''));
-        }
       } 
-      // Continuation of current item
       else if (currentItem) {
         if (Math.abs(currentY - lineObj.y) > 300) {
              items.push(currentItem);
@@ -262,10 +240,17 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
              continue;
         }
 
-        const priceMatches = text.matchAll(/\$([0-9,]+\.[0-9]{2})/g);
-        for (const pm of priceMatches) {
-            const val = parseFloat(pm[1].replace(/,/g, ''));
-            if (currentItem.unitPrice === 0) currentItem.unitPrice = val;
+        if (currentItem.unitPrice === 0) {
+            const qty = currentItem.qty;
+            const unitPriceMatch = text.match(/\$([0-9,]+\.[0-9]{2})\s*ea/i);
+            const allPriceMatches = Array.from(text.matchAll(/\$([0-9,]+\.[0-9]{2})/g));
+
+            if (unitPriceMatch) {
+                currentItem.unitPrice = parseFloat(unitPriceMatch[1].replace(/,/g, ''));
+            } else if (allPriceMatches.length > 0 && qty > 0) {
+                const lineTotal = parseFloat(allPriceMatches[0][1].replace(/,/g, ''));
+                currentItem.unitPrice = lineTotal / qty;
+            }
         }
 
         if (!currentItem.availability) {
@@ -292,7 +277,7 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
              let clean = text;
              clean = clean.replace(/\$[0-9,]+\.[0-9]{2}(?:\s*ea\.)?/gi, '');
              clean = clean.replace(/All \d+ by [A-Za-z0-9 ]+/i, '').replace(/\d+ in stock/i, '').replace(/Contact Dealer/i, '');
-             clean = cleanDescription(clean); // Apply cleaning again
+             clean = cleanDescription(clean);
              
              if (clean.length > 2 && !clean.match(/^\d+\)$/)) { 
                  currentItem.desc += ' ' + clean;
@@ -301,13 +286,6 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
       }
     }
     if (currentItem) items.push(currentItem);
-
-    extractedImages.forEach(img => {
-        let closest: QuoteItem | null = null;
-        let minDiff = Infinity;
-        // Simple heuristic: attach to last item processed
-        // In a real spatial implementation we would match Y coordinates to currentItem.y
-    });
   }
 
   return items;
