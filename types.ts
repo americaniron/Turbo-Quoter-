@@ -1,4 +1,5 @@
 
+
 export interface User {
   username: string;
   role: string;
@@ -33,6 +34,12 @@ export interface SavedClient extends ClientInfo {
   id: string;
 }
 
+export enum PhotoMode {
+  EXTRACT = 'extract',
+  AI = 'ai',
+  NONE = 'none'
+}
+
 export interface AppConfig {
   markupPercentage: number;
   discountPercentage: number;
@@ -43,6 +50,7 @@ export interface AppConfig {
   isInvoice: boolean;
   weightUnit: 'LBS' | 'KG';
   includeAiAnalysis: boolean; 
+  photoMode: PhotoMode;
   paymentTerms?: string;
   specialInstructions?: string;
   shippingCompany?: string;

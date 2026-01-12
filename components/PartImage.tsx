@@ -1,40 +1,49 @@
 
 import React, { useEffect, useState } from 'react';
 import { generatePartImage } from '../services/geminiService.ts';
+import { PhotoMode } from '../types.ts';
 
 interface PartImageProps {
   partNo: string;
   description: string;
-  enableAI: boolean;
-  originalImages?: string[]; // Updated to accept array
+  photoMode: PhotoMode;
+  originalImages?: string[];
 }
 
-export const PartImage: React.FC<PartImageProps> = ({ partNo, description, enableAI, originalImages }) => {
+export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photoMode, originalImages }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [attempted, setAttempted] = useState(false);
 
-  // Check for original images from PDF first
   useEffect(() => {
-    if (originalImages && originalImages.length > 0) {
-        setImageUrl(originalImages[0]);
-        return;
-    }
-    
-    // Fallback to AI if enabled and no original image
-    if (enableAI && !attempted && !imageUrl && (!originalImages || originalImages.length === 0)) {
-      const fetchImage = async () => {
+    // Reset state when props change
+    setImageUrl(null);
+    setLoading(false);
+    setAttempted(false);
+  }, [partNo, description, photoMode, originalImages]);
+
+  useEffect(() => {
+    if (attempted) return;
+
+    const processImage = async () => {
+      setAttempted(true);
+      if (photoMode === PhotoMode.EXTRACT) {
+        if (originalImages && originalImages.length > 0) {
+          setImageUrl(originalImages[0]);
+        }
+      } else if (photoMode === PhotoMode.AI) {
         setLoading(true);
         const url = await generatePartImage(partNo, description);
         setImageUrl(url);
         setLoading(false);
-        setAttempted(true);
-      };
-      
-      const timer = setTimeout(fetchImage, Math.random() * 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [enableAI, partNo, description, attempted, imageUrl, originalImages]);
+      }
+    };
+    
+    // Using a timeout to stagger API calls for multiple items
+    const timer = setTimeout(processImage, Math.random() * 500);
+    return () => clearTimeout(timer);
+
+  }, [photoMode, partNo, description, originalImages, attempted]);
 
   if (loading) {
     return (

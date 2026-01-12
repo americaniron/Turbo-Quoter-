@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { AppConfig, ClientInfo, ParseMode, QuoteItem, SavedClient, User } from '../types.ts';
+import { AppConfig, ClientInfo, ParseMode, QuoteItem, SavedClient, User, PhotoMode } from '../types.ts';
 import { parseTextData, parsePdfFile, parseExcelFile } from '../services/parserService.ts';
 import { Logo } from './Logo.tsx';
 
@@ -8,7 +8,6 @@ interface ConfigPanelProps {
   onDataLoaded: (items: QuoteItem[]) => void;
   onConfigChange: (config: AppConfig) => void;
   onClientChange: (info: ClientInfo) => void;
-  onAiToggle: (enabled: boolean) => void;
   onAnalyze: () => void;
   onSaveQuote: () => void;
   onLoadQuote: (file: File) => void;
@@ -16,7 +15,6 @@ interface ConfigPanelProps {
   onResumeDraft: () => void;
   onEmailDispatch: () => void;
   hasDraft: boolean;
-  aiEnabled: boolean;
   isAnalyzing: boolean;
   config: AppConfig;
   client: ClientInfo;
@@ -47,12 +45,12 @@ const FieldGroup: React.FC<{ label: string; children: React.ReactNode; className
 );
 
 export const ConfigPanel: React.FC<ConfigPanelProps> = ({
-  itemsCount, onDataLoaded, onConfigChange, onClientChange, onAiToggle, onAnalyze, onSaveQuote, 
-  onLoadQuote, onSaveDraft, onResumeDraft, onEmailDispatch, hasDraft, aiEnabled, isAnalyzing, 
+  itemsCount, onDataLoaded, onConfigChange, onClientChange, onAnalyze, onSaveQuote, 
+  onLoadQuote, onSaveDraft, onResumeDraft, onEmailDispatch, hasDraft, isAnalyzing, 
   config, client, customLogo, onLogoUpload, onRefreshId,
   addressBook, onSaveToBook, onDeleteFromBook, currentUser, onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<ParseMode>(ParseMode.PASTE);
+  const [activeTab, setActiveTab] = useState<ParseMode>(ParseMode.PDF);
   const [textInput, setTextInput] = useState("");
   const [status, setStatus] = useState("Ready");
   const [showShipping, setShowShipping] = useState(false);
@@ -390,7 +388,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
 
       <div className="mb-12">
         <div className="flex gap-4 mb-6">
-            {[ParseMode.PASTE, ParseMode.PDF, ParseMode.EXCEL].map(mode => (
+            {[ParseMode.PDF, ParseMode.EXCEL, ParseMode.PASTE].map(mode => (
             <button 
                 key={mode} 
                 onClick={() => setActiveTab(mode)} 
@@ -417,8 +415,8 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                 <p className="text-[14px] font-black uppercase text-slate-500 tracking-[0.3em] group-hover/upload:text-indigo-600 transition-colors">
                   {activeTab === ParseMode.PDF ? 'Select PDF Quote' : 'Select Excel Manifest'}
                 </p>
-                <input ref={pdfInputRef} type="file" className={activeTab === ParseMode.PDF ? "hidden" : "absolute inset-0 opacity-0 pointer-events-none"} accept=".pdf" />
-                <input ref={excelInputRef} type="file" className={activeTab === ParseMode.EXCEL ? "hidden" : "absolute inset-0 opacity-0 pointer-events-none"} accept=".xlsx,.xls,.csv" />
+                <input ref={pdfInputRef} type="file" className="hidden" accept=".pdf" />
+                <input ref={excelInputRef} type="file" className="hidden" accept=".xlsx,.xls,.csv" />
             </label>
             )}
             <div className="absolute top-6 right-10 text-[10px] font-black text-indigo-400 opacity-20 group-hover:opacity-60 transition-opacity tracking-[0.5em]">SYSTEM_I/O_01</div>
@@ -463,13 +461,12 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
               />
             </div>
         </FieldGroup>
-        <FieldGroup label="AI Images" isDark>
-            <button 
-              onClick={() => onAiToggle(!aiEnabled)}
-              className={`w-full h-full p-5 rounded-[1.5rem] border-2 font-black text-[10px] tracking-tight transition-all active:scale-95 ${aiEnabled ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-slate-900 border-slate-800 text-slate-500'}`}
-            >
-              {aiEnabled ? 'ACTIVE' : 'OFF'}
-            </button>
+        <FieldGroup label="Photo Mode" isDark>
+            <div className="flex bg-slate-900 p-2 rounded-[1.5rem] border-2 border-slate-800 h-full text-[10px] font-black">
+                <button onClick={() => updateConfig('photoMode', PhotoMode.EXTRACT)} className={`flex-1 py-3 rounded-xl transition-all ${config.photoMode === PhotoMode.EXTRACT ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>EXTRACT</button>
+                <button onClick={() => updateConfig('photoMode', PhotoMode.AI)} className={`flex-1 py-3 rounded-xl transition-all ${config.photoMode === PhotoMode.AI ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>AI</button>
+                <button onClick={() => updateConfig('photoMode', PhotoMode.NONE)} className={`flex-1 py-3 rounded-xl transition-all ${config.photoMode === PhotoMode.NONE ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>NONE</button>
+            </div>
         </FieldGroup>
       </div>
 

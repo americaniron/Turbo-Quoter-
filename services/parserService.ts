@@ -39,8 +39,8 @@ function cleanDescription(text: string): string {
 
   let cleaned = String(text)
     // Remove Third Party Vendor Names & Specific Addresses (Ring Power, etc)
-    .replace(/Ring Power|RING POWER CORPORATION|Tampa|Riverview|Fern Hill|025069|ADAM qadah|adam@americanyellowiron\.com/gi, "")
-    .replace(/10421 Fern Hill Dr\.|813-671-3700|33578|United States|Florida|Cat Vantage Rewards/gi, "")
+    .replace(/Ring Power|RING POWER CORPORATION|Tampa|Riverview|Fern Hill|025069|ADAM qadah|americanyellowiron\.com/gi, "")
+    .replace(/10421 Fern Hill Dr\.|813-671-3700|33578|United States|Florida|Cat Vantage Rewards|adam@/gi, "")
     // Remove Page Sections & Summary Headers
     .replace(/Order Information|Pickup Location|Pickup Method|SUMMARY OF CHARGES|Items In Your Order|Page \d+ of \d+/gi, "")
     // Remove Table Headers
@@ -49,7 +49,7 @@ function cleanDescription(text: string): string {
     .replace(/ORDER SUBTOTAL|Shipping\/Miscellaneous|Total Tax|ORDER TOTAL|Contact Dealer|SUBTOTAL|TAX/gi, "")
     .replace(/\(USD\)/g, "")
     // Remove specific part-row boilerplate
-    .replace(/Core Charge Included/gi, "")
+    .replace(/Core Charge Included|Remanufactured part/gi, "")
     // Remove trailing/orphaned prices and units
     .replace(/[\$]?[0-9,]+\.[0-9]{2}\s+(?:ea\.?|USD)/gi, "")
     .replace(/[\$]?[0-9,]+\.[0-9]{2}/g, "")
@@ -155,9 +155,10 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
     throw new Error("Could not read PDF structure.");
   }
 
-  const items: QuoteItem[] = [];
+  let items: QuoteItem[] = [];
 
   for (let i = 1; i <= pdf.numPages; i++) {
+    const itemYCoordinates: { item: QuoteItem, y: number }[] = [];
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
 
@@ -189,21 +190,21 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
       };
     }).filter(l => l.text.length > 0);
 
-    const itemStartRegex = /^\s*(\d+)[\)\.]\s+(\d+)\s+([A-Z0-9\-\.:]+)(.*)$/i;
+    const itemStartRegex = /^\s*(\d+)[\)\.]\s+(\d+)\s+([A-Z0-9\-\.:\/]+)(.*)$/i;
     let currentItem: QuoteItem | null = null;
     let currentY = 0;
 
     for (const lineObj of textLines) {
       const text = lineObj.text;
       if (text.match(/SUMMARY OF CHARGES|ORDER TOTAL|SUBTOTAL|TAX|PAGE|INVOICE|QUOTATION|RING POWER|Payment Information/i)) {
-        if (currentItem) { items.push(currentItem); currentItem = null; }
+        if (currentItem) { items.push(currentItem); itemYCoordinates.push({ item: currentItem, y: currentY }); currentItem = null; }
         continue;
       }
 
       const startMatch = text.match(itemStartRegex);
       
       if (startMatch && !isDateString(startMatch[3])) {
-        if (currentItem) items.push(currentItem);
+        if (currentItem) { items.push(currentItem); itemYCoordinates.push({ item: currentItem, y: currentY }); }
 
         const rawPart = startMatch[3].replace(/:$/, '');
         const initialDesc = cleanDescription(startMatch[4]);
@@ -235,32 +236,34 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
       } 
       else if (currentItem) {
         if (Math.abs(currentY - lineObj.y) > 300) {
-             items.push(currentItem);
+             items.push(currentItem); 
+             itemYCoordinates.push({ item: currentItem, y: currentY }); 
              currentItem = null;
              continue;
         }
 
-        if (currentItem.unitPrice === 0) {
-            const qty = currentItem.qty;
+        let tempItem = { ...currentItem };
+        if (tempItem.unitPrice === 0) {
+            const qty = tempItem.qty;
             const unitPriceMatch = text.match(/\$([0-9,]+\.[0-9]{2})\s*ea/i);
             const allPriceMatches = Array.from(text.matchAll(/\$([0-9,]+\.[0-9]{2})/g));
 
             if (unitPriceMatch) {
-                currentItem.unitPrice = parseFloat(unitPriceMatch[1].replace(/,/g, ''));
+                tempItem.unitPrice = parseFloat(unitPriceMatch[1].replace(/,/g, ''));
             } else if (allPriceMatches.length > 0 && qty > 0) {
                 const lineTotal = parseFloat(allPriceMatches[0][1].replace(/,/g, ''));
-                currentItem.unitPrice = lineTotal / qty;
+                tempItem.unitPrice = lineTotal / qty;
             }
         }
 
-        if (!currentItem.availability) {
+        if (!tempItem.availability) {
             const av = extractAvailability(text);
-            if (av.availability) currentItem.availability = av.availability;
+            if (av.availability) tempItem.availability = av.availability;
         }
 
-        if (currentItem.weight === 0) {
+        if (tempItem.weight === 0) {
             const w = extractWeight(text);
-            if (w > 0) currentItem.weight = w;
+            if (w > 0) tempItem.weight = w;
         }
 
         const notePrefixMatch = text.match(/Line item note:\s*(.*)/i);
@@ -268,24 +271,94 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
         const nonReturnable = text.match(/(Non-returnable part)/i);
 
         if (notePrefixMatch) {
-            currentItem.notes = (currentItem.notes ? currentItem.notes + ' ' : '') + notePrefixMatch[1].trim();
+            tempItem.notes = (tempItem.notes ? tempItem.notes + ' ' : '') + notePrefixMatch[1].trim();
         } else if (replacesMatch) {
-            currentItem.notes = (currentItem.notes ? currentItem.notes + ' ' : '') + replacesMatch[1].trim();
+            tempItem.notes = (tempItem.notes ? tempItem.notes + ' ' : '') + replacesMatch[1].trim();
         } else if (nonReturnable) {
-             currentItem.desc += '\n' + nonReturnable[1];
+             tempItem.desc += '\n' + nonReturnable[1];
         } else {
              let clean = text;
              clean = clean.replace(/\$[0-9,]+\.[0-9]{2}(?:\s*ea\.)?/gi, '');
              clean = clean.replace(/All \d+ by [A-Za-z0-9 ]+/i, '').replace(/\d+ in stock/i, '').replace(/Contact Dealer/i, '');
              clean = cleanDescription(clean);
-             
              if (clean.length > 2 && !clean.match(/^\d+\)$/)) { 
-                 currentItem.desc += ' ' + clean;
+                 tempItem.desc += ' ' + clean;
              }
+        }
+        currentItem = tempItem;
+      }
+    }
+    if (currentItem) { items.push(currentItem); itemYCoordinates.push({ item: currentItem, y: currentY }); }
+
+    // --- Image Extraction Logic ---
+    const opList = await page.getOperatorList();
+    const images = [];
+    for (let j = 0; j < opList.fnArray.length; j++) {
+      if (opList.fnArray[j] === window.pdfjsLib.OPS.paintImageXObject) {
+        const imgKey = opList.argsArray[j][0];
+        const currentTransform = opList.argsArray[j-1].slice(); // Heuristic: transform is often before paint
+        if(currentTransform && currentTransform.length === 6) {
+             images.push({ key: imgKey, y: currentTransform[5], x: currentTransform[4] });
         }
       }
     }
-    if (currentItem) items.push(currentItem);
+
+    for (const image of images) {
+        const imgData = await page.objs.get(image.key);
+        if(!imgData || !imgData.data) continue;
+
+        const canvas = document.createElement("canvas");
+        canvas.width = imgData.width;
+        canvas.height = imgData.height;
+        const ctx = canvas.getContext("2d");
+        if(!ctx) continue;
+
+        const pixels = ctx.createImageData(imgData.width, imgData.height);
+        if (imgData.kind === window.pdfjsLib.ImageKind.GRAYSCALE_1BPP) {
+            // Handle simple B&W images
+            let k = 0;
+            for (let i = 0; i < imgData.data.length; i++) {
+                const byte = imgData.data[i];
+                for (let bit = 7; bit >= 0; bit--) {
+                    // FIX: Changed `const-` to `const` due to a typo.
+                    const monotoken = (byte >> bit) & 1;
+                    const color = monotoken === 0 ? 255 : 0;
+                    pixels.data[k++] = color;
+                    pixels.data[k++] = color;
+                    pixels.data[k++] = color;
+                    pixels.data[k++] = 255;
+                }
+            }
+        } else if(imgData.kind === window.pdfjsLib.ImageKind.RGB_24BPP) {
+             // Handle RGB images
+            let k = 0;
+            for (let i = 0; i < imgData.data.length; i += 3) {
+                pixels.data[k++] = imgData.data[i];
+                pixels.data[k++] = imgData.data[i+1];
+                pixels.data[k++] = imgData.data[i+2];
+                pixels.data[k++] = 255;
+            }
+        } else {
+            pixels.data.set(new Uint8ClampedArray(imgData.data));
+        }
+        ctx.putImageData(pixels, 0, 0);
+
+        const dataUrl = canvas.toDataURL();
+
+        // Associate image with the closest item by Y-coordinate
+        let closestItem = null;
+        let minDiff = Infinity;
+        for (const itemCoord of itemYCoordinates) {
+            const diff = Math.abs(itemCoord.y - image.y);
+            if (diff < minDiff && diff < 50) { // 50px tolerance
+                minDiff = diff;
+                closestItem = itemCoord.item;
+            }
+        }
+        if (closestItem && closestItem.originalImages) {
+            closestItem.originalImages.push(dataUrl);
+        }
+    }
   }
 
   return items;

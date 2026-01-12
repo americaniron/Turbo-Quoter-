@@ -3,7 +3,7 @@ import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
 import { EmailModule } from './components/EmailModule.tsx';
 import { Login } from './components/Login.tsx';
-import { QuoteItem, ClientInfo, AppConfig, SavedClient, User } from './types.ts';
+import { QuoteItem, ClientInfo, AppConfig, SavedClient, User, PhotoMode } from './types.ts';
 import { analyzeQuoteData } from './services/geminiService.ts';
 
 const generateDocumentId = (isInvoice: boolean) => {
@@ -48,6 +48,7 @@ const App: React.FC = () => {
     isInvoice: false,
     weightUnit: 'LBS',
     includeAiAnalysis: false,
+    photoMode: PhotoMode.EXTRACT,
     shippingCompany: '',
     shippingPhone: '',
     shippingAddress: '',
@@ -57,8 +58,6 @@ const App: React.FC = () => {
     shippingCountry: 'United States'
   });
   
-  // Default AI images to FALSE as per user request
-  const [aiEnabled, setAiEnabled] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [customLogo, setCustomLogo] = useState<string | null>(null);
@@ -245,7 +244,6 @@ const App: React.FC = () => {
         onDataLoaded={handleDataLoaded}
         onConfigChange={setConfig}
         onClientChange={setClient}
-        onAiToggle={setAiEnabled}
         onAnalyze={handleAnalyze}
         onSaveQuote={handleSaveQuote}
         onLoadQuote={handleLoadQuote}
@@ -253,7 +251,6 @@ const App: React.FC = () => {
         onResumeDraft={handleResumeDraft}
         onEmailDispatch={() => setIsEmailOpen(true)}
         hasDraft={hasDraft}
-        aiEnabled={aiEnabled}
         isAnalyzing={isAnalyzing}
         config={config}
         client={client}
@@ -272,7 +269,6 @@ const App: React.FC = () => {
             items={items} 
             client={client} 
             config={config} 
-            aiEnabled={aiEnabled}
             aiAnalysis={aiAnalysis}
             customLogo={customLogo}
         />
