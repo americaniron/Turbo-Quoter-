@@ -37,7 +37,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
   const total = subtotalAfterDiscount + logisticsCost;
 
   return (
-    <div className="max-w-[1000px] mx-auto bg-white p-12 min-h-screen text-[#333] font-sans print:p-8 print:w-full print:max-w-none relative font-[Helvetica]">
+    <div className="max-w-[1000px] mx-auto bg-white p-12 min-h-screen text-[#333] font-sans print:p-8 print:w-full print:max-w-none font-[Helvetica]">
       
       {/* Header */}
       <header className="flex justify-between items-start mb-8">
@@ -166,12 +166,15 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
         </div>
       )}
 
-      <div className="print-footer print-only mt-auto pt-8 text-center text-[8px] text-gray-400">
-         <p className="italic mb-2 text-gray-500">
-            This document is a quotation on the goods named, subject to the conditions noted. All orders are subject to acceptance by American Iron LLC. Prices are subject to change without notice. Please check for discrepancies. All sales are final.
+      <div className="print-footer print-only mt-auto pt-8 text-[8px] text-gray-700">
+         <h4 className="font-bold uppercase text-[9px] mb-1">Terms & Conditions</h4>
+         <p className="italic mb-2 text-gray-600 whitespace-pre-wrap text-justify">
+NEW PARTS TERMS / WARRANTY DISCLAIMER / LIMITATION OF LIABILITY: All products sold by American Iron LLC are brand new. Except as expressly stated in writing by Seller, Seller disclaims all warranties, express or implied, including any implied warranties of merchantability and fitness for a particular purpose. Any warranty coverage offered with the product (if any) is provided solely by the product’s manufacturer and is governed by the manufacturer’s warranty terms, procedures, and limitations; Seller does not control manufacturer warranty determinations.
+
+Buyer is solely responsible for confirming part number accuracy, compatibility, serial-number range/application, and proper installation. Seller shall not be liable for labor, removal/installation, travel, towing, freight, downtime, loss of profits, loss of use, or any indirect, incidental, special, or consequential damages. Seller’s maximum liability for any claim is limited to the invoice price paid for the specific item(s) giving rise to the claim, at Seller’s option. Title and risk of loss transfer upon pickup or tender to carrier unless otherwise agreed in writing.
          </p>
-         <p>
-            American Iron LLC • Page <span className="page-number"></span>
+         <p className="page-number-container">
+            {/* Content generated via CSS for print reliability */}
          </p>
       </div>
     </div>

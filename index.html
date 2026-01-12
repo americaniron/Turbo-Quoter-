@@ -81,21 +81,22 @@
             }
             .print-footer {
                 position: fixed;
-                bottom: 15mm;
-                left: 0;
-                right: 0;
+                bottom: 5mm;
+                left: 10mm;
+                right: 10mm;
                 text-align: center;
                 pointer-events: none;
                 z-index: 9999;
             }
-            .page-number {
+            .page-number-container {
                 counter-increment: page;
             }
-            .page-number::after {
-                content: counter(page);
+            .page-number-container::after {
+                content: "American Iron LLC • Page " counter(page);
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 8px;
                 font-weight: 800;
+                color: #4b5563; /* text-gray-600 */
             }
         }
 
