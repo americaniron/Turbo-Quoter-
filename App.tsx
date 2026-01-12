@@ -26,7 +26,22 @@ const App: React.FC = () => {
   };
 
   const [items, setItems] = useState<QuoteItem[]>([]);
-  const [addressBook, setAddressBook] = useState<SavedClient[]>([]);
+  
+  // Requirement 1 & 6: Global key for address book to prevent erasure and share between modes
+  const GLOBAL_BOOK_KEY = 'american_iron_global_address_book';
+  
+  const [addressBook, setAddressBook] = useState<SavedClient[]>(() => {
+    const savedBook = localStorage.getItem('american_iron_global_address_book');
+    if (savedBook) {
+      try {
+        return JSON.parse(savedBook);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
   const [client, setClient] = useState<ClientInfo>({ 
     accountNumber: '',
     company: '', 
@@ -39,6 +54,7 @@ const App: React.FC = () => {
     zip: '',
     country: 'United States'
   });
+
   const [config, setConfig] = useState<AppConfig>({ 
     markupPercentage: 25, 
     discountPercentage: 0,
@@ -70,32 +86,25 @@ const App: React.FC = () => {
 
   const getStorageKey = (base: string) => user ? `${base}_${user.username}` : base;
 
+  // Requirement 4 & 5: Force print title settings
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      document.title = "AMERICAN IRON LLC QUOTING HUB";
+    };
+    window.addEventListener('beforeprint', handleBeforePrint);
+    return () => window.removeEventListener('beforeprint', handleBeforePrint);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
-
     const draft = localStorage.getItem(getStorageKey('american_iron_draft'));
     setHasDraft(!!draft);
-
-    const savedBook = localStorage.getItem(getStorageKey('american_iron_address_book'));
-    if (savedBook) {
-      try {
-        setAddressBook(JSON.parse(savedBook));
-      } catch (e) {
-        setAddressBook([]);
-      }
-    } else {
-        setAddressBook([]);
-    }
-    
-    setItems([]);
-    setAiAnalysis(null);
   }, [user]);
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem(getStorageKey('american_iron_address_book'), JSON.stringify(addressBook));
-    }
-  }, [addressBook, user]);
+    // Persist address book globally whenever it changes
+    localStorage.setItem(GLOBAL_BOOK_KEY, JSON.stringify(addressBook));
+  }, [addressBook]);
 
   const handleLogin = (u: User) => {
     sessionStorage.setItem('ai_current_user', JSON.stringify(u));
@@ -166,13 +175,11 @@ const App: React.FC = () => {
         document.body.appendChild(link);
         link.click();
         
-        // Cleanup
         setTimeout(() => {
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }, 100);
 
-        // Prompt for email after save
         if (client.email) {
           if (confirm("Document exported successfully. Commence AI Dispatch Protocol to " + client.email + "?")) {
             setIsEmailOpen(true);

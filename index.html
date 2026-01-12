@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#121212" />
     <meta name="description" content="American Iron Logistics & Supply Hub - Global Heavy Machinery Quoting System" />
-    <title>American Iron Hub</title>
+    <title>AMERICAN IRON LLC QUOTING HUB</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- PDF.js & XLSX CDNs -->
@@ -46,11 +46,10 @@
         @media print {
             @page {
                 size: portrait;
-                margin: 10mm;
+                margin: 15mm 10mm 25mm 10mm;
             }
             html, body {
                 width: 210mm;
-                height: 297mm;
                 background: white !important;
                 -webkit-print-color-adjust: exact !important; 
                 print-color-adjust: exact !important;
@@ -58,45 +57,33 @@
                 padding: 0 !important;
                 counter-reset: page;
             }
-            thead {
-                display: table-header-group;
-            }
-            tfoot {
-                display: table-footer-group;
-            }
             .no-print { display: none !important; }
             #root { 
                 margin: 0 !important; 
                 padding: 0 !important; 
                 width: 100% !important;
-                height: auto !important;
-                overflow: visible !important;
-            }
-            .quote-preview-container {
-                box-shadow: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                border: none !important;
-                width: 100% !important;
             }
             .print-footer {
                 position: fixed;
-                bottom: 5mm;
-                left: 10mm;
-                right: 10mm;
-                text-align: center;
-                pointer-events: none;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                padding: 5mm 10mm;
+                background: white;
+                border-top: 1px solid #eee;
                 z-index: 9999;
+                text-align: center;
             }
             .page-number-container {
                 counter-increment: page;
+                margin-top: 2mm;
             }
             .page-number-container::after {
-                content: "American Iron LLC • Page " counter(page);
+                content: "Page " counter(page);
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 8px;
                 font-weight: 800;
-                color: #4b5563; /* text-gray-600 */
+                color: #4b5563;
             }
         }
 
