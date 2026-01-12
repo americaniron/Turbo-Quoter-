@@ -38,11 +38,13 @@ function cleanDescription(text: string): string {
   if (!text) return "";
 
   let cleaned = String(text)
+    // Remove specific URL artifacts from CAT PDFs
+    .replace(/\/\/parts\.cat\.com\/[^\s]*/gi, '')
     // Remove Third Party Vendor Names & Specific Addresses (Ring Power, etc)
     .replace(/Ring Power|RING POWER CORPORATION|Tampa|Riverview|Fern Hill|025069|ADAM qadah|americanyellowiron\.com/gi, "")
     .replace(/10421 Fern Hill Dr\.|813-671-3700|33578|United States|Florida|Cat Vantage Rewards|adam@/gi, "")
     // Remove Page Sections & Summary Headers
-    .replace(/Order Information|Pickup Location|Pickup Method|SUMMARY OF CHARGES|Items In Your Order|Page \d+ of \d+/gi, "")
+    .replace(/Order Information|Order Summary|View Order|Ship To|Bill To|Payment Method|Tracking Number|Add to Cart|Pickup Location|Pickup Method|SUMMARY OF CHARGES|Items In Your Order|Page \d+ of \d+/gi, "")
     // Remove Table Headers
     .replace(/\b(Unit Price|Extended Price|Total Price|Product Description|Line Item|Availability|Notes|Quantity|Part Number|Description)\b/gi, "")
     // Remove Summary Labels aggressively
@@ -315,12 +317,10 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
 
         const pixels = ctx.createImageData(imgData.width, imgData.height);
         if (imgData.kind === window.pdfjsLib.ImageKind.GRAYSCALE_1BPP) {
-            // Handle simple B&W images
             let k = 0;
             for (let i = 0; i < imgData.data.length; i++) {
                 const byte = imgData.data[i];
                 for (let bit = 7; bit >= 0; bit--) {
-                    // FIX: Changed `const-` to `const` due to a typo.
                     const monotoken = (byte >> bit) & 1;
                     const color = monotoken === 0 ? 255 : 0;
                     pixels.data[k++] = color;
@@ -330,13 +330,20 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
                 }
             }
         } else if(imgData.kind === window.pdfjsLib.ImageKind.RGB_24BPP) {
-             // Handle RGB images
             let k = 0;
             for (let i = 0; i < imgData.data.length; i += 3) {
                 pixels.data[k++] = imgData.data[i];
                 pixels.data[k++] = imgData.data[i+1];
                 pixels.data[k++] = imgData.data[i+2];
                 pixels.data[k++] = 255;
+            }
+        } else if(imgData.kind === window.pdfjsLib.ImageKind.RGBA_32BPP) {
+            let k = 0;
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                pixels.data[k++] = imgData.data[i];
+                pixels.data[k++] = imgData.data[i+1];
+                pixels.data[k++] = imgData.data[i+2];
+                pixels.data[k++] = imgData.data[i+3];
             }
         } else {
             pixels.data.set(new Uint8ClampedArray(imgData.data));

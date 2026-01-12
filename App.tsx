@@ -28,6 +28,7 @@ const App: React.FC = () => {
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [addressBook, setAddressBook] = useState<SavedClient[]>([]);
   const [client, setClient] = useState<ClientInfo>({ 
+    accountNumber: '',
     company: '', 
     contactName: '',
     email: '', 
@@ -49,6 +50,7 @@ const App: React.FC = () => {
     weightUnit: 'LBS',
     includeAiAnalysis: false,
     photoMode: PhotoMode.EXTRACT,
+    paymentTerms: 'Net 30',
     shippingCompany: '',
     shippingPhone: '',
     shippingAddress: '',

@@ -88,9 +88,10 @@
                 pointer-events: none;
                 z-index: 9999;
             }
-            /* Fixed selector to match React component class */
-            .page-number::after {
+            .page-number {
                 counter-increment: page;
+            }
+            .page-number::after {
                 content: counter(page);
                 font-family: 'JetBrains Mono', monospace;
                 font-size: 8px;

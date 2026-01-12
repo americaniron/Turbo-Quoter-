@@ -264,10 +264,13 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           </div>
           
           <div className="grid grid-cols-4 gap-6">
+             <FieldGroup label="Account Number" className="col-span-4">
+                <input className="w-full p-5 bg-white border-2 border-slate-200 rounded-2xl text-[13px] font-bold uppercase shadow-sm" placeholder="e.g. 025069" value={client.accountNumber} onChange={(e) => updateClient('accountNumber', e.target.value)} />
+             </FieldGroup>
              <FieldGroup label="Company Entity" className="col-span-4">
                 <input className="w-full p-5 bg-white border-2 border-slate-200 rounded-2xl text-[13px] font-bold uppercase shadow-sm" placeholder="FULL COMPANY NAME..." value={client.company} onChange={(e) => updateClient('company', e.target.value)} />
              </FieldGroup>
-             <FieldGroup label="Primary Contact" className="col-span-2">
+             <FieldGroup label="Ordered By / Contact" className="col-span-2">
                 <input className="w-full p-5 bg-white border-2 border-slate-200 rounded-2xl text-[13px] font-bold uppercase shadow-sm" placeholder="AUTHORIZED AGENT..." value={client.contactName} onChange={(e) => updateClient('contactName', e.target.value)} />
              </FieldGroup>
              <FieldGroup label="Phone Network" className="col-span-2">
@@ -423,7 +426,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-6 mb-16">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6 mb-16">
         <FieldGroup label="Pricing Markup" isDark>
             <select value={config.markupPercentage} onChange={(e) => updateConfig('markupPercentage', parseInt(e.target.value))} className="w-full p-5 bg-slate-900 text-[#ffcd00] text-[14px] font-black rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none appearance-none cursor-pointer">
                 {markupOptions.map(opt => <option key={opt} value={opt}>{opt}% MARGIN</option>)}
@@ -432,6 +435,14 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         <FieldGroup label="Trade Discount" isDark>
             <select value={config.discountPercentage} onChange={(e) => updateConfig('discountPercentage', parseInt(e.target.value))} className="w-full p-5 bg-slate-900 text-emerald-400 text-[14px] font-black rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none appearance-none cursor-pointer">
                 {discountOptions.map(opt => <option key={opt} value={opt}>{opt}% OFF</option>)}
+            </select>
+        </FieldGroup>
+        <FieldGroup label="Payment Terms" isDark>
+            <select value={config.paymentTerms} onChange={(e) => updateConfig('paymentTerms', e.target.value)} className="w-full p-5 bg-slate-900 text-white text-[14px] font-black rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none appearance-none cursor-pointer">
+                <option value="Cash">Cash</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Net 30">Net 30</option>
+                <option value="Net 60">Net 60</option>
             </select>
         </FieldGroup>
         <FieldGroup label="Metrics" isDark>

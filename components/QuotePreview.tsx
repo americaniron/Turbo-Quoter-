@@ -61,7 +61,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
         <div className="border p-4 rounded-md">
           <h3 className="font-bold text-sm mb-2 border-b pb-1">Order Information</h3>
           <div className="grid grid-cols-[120px_1fr] gap-1">
-            <span className="font-semibold text-gray-600">Account Number:</span><span>{client.company}</span>
+            <span className="font-semibold text-gray-600">Account Number:</span><span>{client.accountNumber ? `${client.accountNumber} - ${client.company}` : client.company}</span>
             <span className="font-semibold text-gray-600">Request By Date:</span><span>{new Date().toLocaleDateString()}</span>
             <span className="font-semibold text-gray-600">Ordered By:</span>
             <div className="flex flex-col">
@@ -127,7 +127,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
                         <div>
                            <div className="font-bold text-gray-800">{item.partNo}</div>
                            <div className="text-gray-600 mt-1 whitespace-pre-wrap">{item.desc}</div>
-                           <div className="text-gray-500 text-[10px] mt-1">{item.weight.toFixed(1)} lbs</div>
+                           <div className="text-gray-500 text-[10px] mt-1">{item.weight.toFixed(2)} lbs</div>
                         </div>
                      </td>
                      <td className="p-2 text-indigo-700 italic">{item.notes}</td>
@@ -146,6 +146,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
       <div className="flex justify-end mt-8">
         <div className="w-full max-w-sm space-y-2">
             <h3 className="font-bold text-sm mb-2 border-b pb-1">SUMMARY OF CHARGES</h3>
+            <SummaryLine label={`Est. Total Weight (${unitLabel.toUpperCase()})`} value={`${displayTotalWeight.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unitLabel}`} />
             <SummaryLine label="ORDER SUBTOTAL" value={`$${subtotalBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             {discountAmount > 0 && (
               <SummaryLine label={`TRADE DISCOUNT (${config.discountPercentage}%)`} value={`-$${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
@@ -166,7 +167,12 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
       )}
 
       <div className="print-footer print-only mt-auto pt-8 text-center text-[8px] text-gray-400">
-         American Iron LLC • Page <span className="page-number"></span>
+         <p className="italic mb-2 text-gray-500">
+            This document is a quotation on the goods named, subject to the conditions noted. All orders are subject to acceptance by American Iron LLC. Prices are subject to change without notice. Please check for discrepancies. All sales are final.
+         </p>
+         <p>
+            American Iron LLC • Page <span className="page-number"></span>
+         </p>
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ export interface QuoteItem {
 }
 
 export interface ClientInfo {
+  accountNumber: string;
   company: string;
   contactName: string;
   email: string;
