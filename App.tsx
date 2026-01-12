@@ -31,11 +31,12 @@ const App: React.FC = () => {
   const GLOBAL_BOOK_KEY = 'american_iron_global_address_book';
   
   const [addressBook, setAddressBook] = useState<SavedClient[]>(() => {
-    const savedBook = localStorage.getItem('american_iron_global_address_book');
+    const savedBook = localStorage.getItem(GLOBAL_BOOK_KEY);
     if (savedBook) {
       try {
         return JSON.parse(savedBook);
       } catch (e) {
+        console.error("Failed to parse address book from localStorage", e);
         return [];
       }
     }
@@ -89,10 +90,17 @@ const App: React.FC = () => {
   // Requirement 4 & 5: Force print title settings
   useEffect(() => {
     const handleBeforePrint = () => {
-      document.title = "AMERICAN IRON LLC QUOTING HUB";
+      document.title = "AMERICAN IRON LLC BILLING HUB";
+    };
+    const handleAfterPrint = () => {
+      document.title = "AMERICAN IRON LLC BILLING HUB";
     };
     window.addEventListener('beforeprint', handleBeforePrint);
-    return () => window.removeEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
   }, []);
 
   useEffect(() => {
@@ -103,7 +111,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Persist address book globally whenever it changes
-    localStorage.setItem(GLOBAL_BOOK_KEY, JSON.stringify(addressBook));
+    if (addressBook.length > 0 || localStorage.getItem(GLOBAL_BOOK_KEY)) {
+      localStorage.setItem(GLOBAL_BOOK_KEY, JSON.stringify(addressBook));
+    }
   }, [addressBook]);
 
   const handleLogin = (u: User) => {

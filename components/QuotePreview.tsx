@@ -48,7 +48,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
                <Logo className="h-12" />
             </div>
           }
-          <h1 className="text-2xl font-extrabold tracking-wider text-black">AMERICAN IRON LLC QUOTING HUB</h1>
+          <h1 className="text-2xl font-extrabold tracking-wider text-black">AMERICAN IRON LLC BILLING HUB</h1>
         </div>
         <div className="text-right">
           <h2 className="text-3xl font-extrabold">{config.isInvoice ? 'INVOICE' : 'QUOTATION'}</h2>
