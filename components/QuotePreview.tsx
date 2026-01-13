@@ -133,8 +133,8 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
                      <td className="p-2 text-indigo-700 italic">{item.notes}</td>
                      <td className="p-2 font-semibold text-emerald-700">{item.availability}</td>
                      <td className="p-2 text-right">
-                        <div className="font-bold">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-                        <div className="text-gray-500">${markedUpPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} ea.</div>
+                        <div className="font-bold">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="text-gray-500">${markedUpPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ea.</div>
                      </td>
                   </tr>
                );
@@ -147,15 +147,15 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
         <div className="w-full max-w-sm space-y-2">
             <h3 className="font-bold text-sm mb-2 border-b pb-1">SUMMARY OF CHARGES</h3>
             <SummaryLine label={`Est. Total Weight (${unitLabel.toUpperCase()})`} value={`${displayTotalWeight.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unitLabel}`} />
-            <SummaryLine label="ORDER SUBTOTAL" value={`$${subtotalBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            <SummaryLine label="ORDER SUBTOTAL" value={`$${subtotalBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
             {discountAmount > 0 && (
-              <SummaryLine label={`TRADE DISCOUNT (${config.discountPercentage}%)`} value={`-$${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+              <SummaryLine label={`TRADE DISCOUNT (${config.discountPercentage}%)`} value={`-$${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
             )}
             {logisticsCost > 0 && (
-                <SummaryLine label="Shipping/Miscellaneous" value={`$${logisticsCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                <SummaryLine label="Shipping/Miscellaneous" value={`$${logisticsCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
             )}
             <SummaryLine label="Total Tax" value="$0.00" />
-            <SummaryLine label="ORDER TOTAL" value={`$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} isTotal={true} />
+            <SummaryLine label="ORDER TOTAL" value={`$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} isTotal={true} />
         </div>
       </div>
       
