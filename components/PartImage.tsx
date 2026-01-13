@@ -27,11 +27,15 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photo
 
     const processImage = async () => {
       setAttempted(true);
-      if (photoMode === PhotoMode.EXTRACT) {
-        if (originalImages && originalImages.length > 0) {
-          setImageUrl(originalImages[0]);
-        }
-      } else if (photoMode === PhotoMode.AI) {
+      
+      // In EXTRACT mode, prioritize original/extracted images.
+      if (photoMode === PhotoMode.EXTRACT && originalImages && originalImages.length > 0) {
+        setImageUrl(originalImages[0]);
+        return; // Image found, no need to proceed to AI generation.
+      }
+
+      // Fallback to AI generation for EXTRACT mode (if no images were found) or for explicit AI mode.
+      if (photoMode === PhotoMode.EXTRACT || photoMode === PhotoMode.AI) {
         setLoading(true);
         const url = await generatePartImage(partNo, description);
         setImageUrl(url);

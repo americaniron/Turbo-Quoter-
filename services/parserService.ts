@@ -306,6 +306,7 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
     }
 
     for (const image of images) {
+      try {
         const imgData = await page.objs.get(image.key);
         if(!imgData || !imgData.data) continue;
 
@@ -365,6 +366,10 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
         if (closestItem && closestItem.originalImages) {
             closestItem.originalImages.push(dataUrl);
         }
+      } catch (e) {
+        console.warn(`Could not resolve image object '${image.key}':`, e);
+        // Continue to next image if one fails
+      }
     }
   }
 
