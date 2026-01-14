@@ -96,8 +96,25 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       setTimeout(() => setStatus("Ready"), 3000);
     }
   };
-
+  
   const updateConfig = (key: keyof AppConfig, val: any) => {
+    if (key === 'weightUnit') {
+      const newUnit = val as 'LBS' | 'KG';
+      const oldUnit = config.weightUnit;
+      if (newUnit !== oldUnit) {
+        const conversionFactor = 2.20462; // lbs per kg
+        let newRate = config.logisticsRate;
+        if (oldUnit === 'LBS' && newUnit === 'KG') {
+          // from $/lb to $/kg
+          newRate = config.logisticsRate * conversionFactor;
+        } else if (oldUnit === 'KG' && newUnit === 'LBS') {
+          // from $/kg to $/lb
+          newRate = config.logisticsRate / conversionFactor;
+        }
+        onConfigChange({ ...config, weightUnit: newUnit, logisticsRate: parseFloat(newRate.toFixed(4)) });
+        return;
+      }
+    }
     onConfigChange({ ...config, [key]: val });
   };
 
@@ -460,7 +477,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         <FieldGroup label="P.O. REF" isDark>
             <input type="text" value={config.poNumber} onChange={(e) => updateConfig('poNumber', e.target.value)} className="w-full p-5 bg-slate-900 text-white text-[12px] font-mono font-bold rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none" placeholder="---" />
         </FieldGroup>
-        <FieldGroup label="Logistics Rate" isDark>
+        <FieldGroup label={`Logistics Rate ($/${config.weightUnit})`} isDark>
             <div className="relative">
               <input 
                 type="number" 

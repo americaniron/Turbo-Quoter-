@@ -13,7 +13,8 @@ function extractAvailability(text: string): { availability: string, remainingTex
     /\bIn\s+Stock\b/i,
     /Contact\s+Dealer/i,
     /Backorder/i,
-    /Lead\s+Time[:\s]+\d+\s+Days/i
+    /Lead\s+Time[:\s]+\d+\s+Days/i,
+    /\d+\s+Weeks/i
   ];
 
   let availability = "";
@@ -28,7 +29,7 @@ function extractAvailability(text: string): { availability: string, remainingTex
     }
   }
 
-  return { availability, remainingText };
+  return { availability: availability.trim(), remainingText };
 }
 
 /**
@@ -38,37 +39,28 @@ function cleanDescription(text: string): string {
   if (!text) return "";
 
   let cleaned = String(text)
-    // Remove specific URL artifacts from CAT PDFs
     .replace(/\/\/parts\.cat\.com\/[^\s]*/gi, '')
-    // Remove Third Party Vendor Names & Specific Addresses (Ring Power, etc)
-    .replace(/Ring Power|RING POWER CORPORATION|Tampa|Riverview|Fern Hill|025069|ADAM qadah|americanyellowiron\.com/gi, "")
+    .replace(/Ring Power|RING POWER CORPORATION|Industrial Parts Depot, LLC|COSTEX TRACTOR PARTS/gi, "")
+    .replace(/Tampa|Riverview|Fern Hill|025069|ADAM qadah|americanyellowiron\.com|Carson CA 90746|Miami, FL 33166/gi, "")
     .replace(/10421 Fern Hill Dr\.|813-671-3700|33578|United States|Florida|Cat Vantage Rewards|adam@/gi, "")
-    // Remove Page Sections & Summary Headers
     .replace(/Order Information|Order Summary|View Order|Ship To|Bill To|Payment Method|Tracking Number|Add to Cart|Pickup Location|Pickup Method|SUMMARY OF CHARGES|Items In Your Order|Page \d+ of \d+/gi, "")
-    // Remove Table Headers
-    .replace(/\b(Unit Price|Extended Price|Total Price|Product Description|Line Item|Availability|Notes|Quantity|Part Number|Description)\b/gi, "")
-    // Remove Summary Labels aggressively
-    .replace(/ORDER SUBTOTAL|Shipping\/Miscellaneous|Total Tax|ORDER TOTAL|Contact Dealer|SUBTOTAL|TAX/gi, "")
-    .replace(/\(USD\)/g, "")
-    // Remove specific part-row boilerplate
-    .replace(/Core Charge Included|Remanufactured part/gi, "")
-    // Remove trailing/orphaned prices and units
-    .replace(/[\$]?[0-9,]+\.[0-9]{2}\s+(?:ea\.?|USD)/gi, "")
+    .replace(/\b(Unit Price|Extended Price|Total Price|Product Description|Line Item|Availability|Notes|Quantity|Part Number|Description|Comments|Wt\.|Unit|Extended)\b/gi, "")
+    .replace(/ORDER SUBTOTAL|Shipping\/Miscellaneous|Total Tax|ORDER TOTAL|Contact Dealer|SUBTOTAL|TAX|Net Price|Line Total/gi, "")
+    .replace(/\(USD\)|USD/g, "")
+    .replace(/Core Charge Included|Remanufactured part|Non-returnable part/gi, "")
+    .replace(/[\$]?[0-9,]+\.[0-9]{2}\s*(?:ea\.?)/gi, "")
     .replace(/[\$]?[0-9,]+\.[0-9]{2}/g, "")
-    // Clean up characters
     .replace(/[:|]/g, " ")
     .trim();
 
-  // Remove leading row indexes or common PDF artifacts (e.g. "10 ", "001 ", "1) ")
   cleaned = cleaned.replace(/^(?:\d+[\s)\.]*)+/, "");
-  // Remove leading symbols
   cleaned = cleaned.replace(/^[\s\-_>]+/, "");
 
   return cleaned.replace(/\s{2,}/g, " ").trim();
 }
 
 function extractWeight(text: string): number {
-  const m = String(text).match(/(\d+(?:\.\d+)?)\s*(lb|lbs|1bs|kg|kgs|kilogram|k\.g\.)\b/i);
+  const m = String(text).match(/(\d+(?:\.\d+)?)\s*(lb|lbs|1bs|LBS|kg|kgs|kilogram|k\.g\.)\b/i);
   if (!m) return 0;
 
   const val = parseFloat(m[1]);
@@ -77,7 +69,6 @@ function extractWeight(text: string): number {
   if (unit.includes("kg") || unit.includes("kilogram") || unit.includes("k.g")) {
     return val * 2.20462;
   }
-
   return val;
 }
 
@@ -85,47 +76,197 @@ function isDateString(str: string): boolean {
   return /^\d{1,2}[-\/]\d{2,4}$/.test(str) || /^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}$/.test(str);
 }
 
-export const parseTextData = (text: string): QuoteItem[] => {
-  const lines = text.split('\n');
+// --- Vendor-Specific Parsers ---
+
+/** Parser for Ring Power format */
+function parseRingPowerPage(textLines: {y: number, text: string}[]): QuoteItem[] {
   const items: QuoteItem[] = [];
-  
-  const lineRegex = /(?:^|\s)(?:(\d+)[\)\.]?\s+)?(\d+)\s+([A-Z0-9\.\/-]{3,20})(?::|\s+|$)(.+)$/i;
+  const itemStartRegex = /^\s*(\d+)[\)\.]\s+(\d+)\s+([A-Z0-9\-\.:\/]+)(.*)$/i;
+  let currentItem: QuoteItem | null = null;
+  let currentY = 0;
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    const m = trimmed.match(lineRegex);
-    if (m) {
-      if (isDateString(m[3])) continue;
+  for (const lineObj of textLines) {
+    const text = lineObj.text;
+    if (text.match(/SUMMARY OF CHARGES|ORDER TOTAL|SUBTOTAL|TAX|PAGE|INVOICE|QUOTATION/i)) {
+      if (currentItem) items.push(currentItem);
+      currentItem = null;
+      continue;
+    }
 
-      const qty = parseInt(m[2]);
-      const restOfLine = m[4] || "";
+    const startMatch = text.match(itemStartRegex);
+    if (startMatch && !isDateString(startMatch[3])) {
+      if (currentItem) items.push(currentItem);
 
+      const qty = parseInt(startMatch[2]);
+      const rawPart = startMatch[3].replace(/:$/, '');
+      const initialDesc = cleanDescription(startMatch[4]);
+      
       let unitPrice = 0;
-      const unitPriceMatch = restOfLine.match(/\$([0-9,]+\.[0-9]{2})\s*ea/i);
-      const allPriceMatches = Array.from(restOfLine.matchAll(/\$([0-9,]+\.[0-9]{2})/g));
+      const unitPriceMatch = text.match(/\$([0-9,]+\.[0-9]{2})\s*ea/i);
+      const allPriceMatches = Array.from(text.matchAll(/\$([0-9,]+\.[0-9]{2})/g));
 
       if (unitPriceMatch) {
           unitPrice = parseFloat(unitPriceMatch[1].replace(/,/g, ''));
       } else if (allPriceMatches.length > 0 && qty > 0) {
-          const lineTotal = parseFloat(allPriceMatches[0][1].replace(/,/g, ''));
+          const lineTotal = parseFloat(allPriceMatches[allPriceMatches.length - 1][1].replace(/,/g, ''));
           unitPrice = lineTotal / qty;
       }
+      
+      currentItem = {
+         lineNo: startMatch[1],
+         qty: qty,
+         partNo: rawPart,
+         desc: initialDesc || "CAT COMPONENT",
+         weight: extractWeight(text),
+         unitPrice: unitPrice,
+         availability: extractAvailability(text).availability,
+         notes: '',
+         originalImages: []
+      };
+      currentY = lineObj.y;
+    } else if (currentItem) {
+      if (Math.abs(currentY - lineObj.y) > 300) {
+           items.push(currentItem); 
+           currentItem = null;
+           continue;
+      }
+      let clean = text.replace(/\$[0-9,]+\.[0-9]{2}(?:\s*ea\.)?/gi, '');
+      if (currentItem.weight === 0) currentItem.weight = extractWeight(text);
+      if (!currentItem.availability) currentItem.availability = extractAvailability(text).availability;
 
-      items.push({
-        lineNo: m[1],
-        qty: qty,
-        partNo: m[3],
-        desc: cleanDescription(restOfLine.replace(/\$[0-9,.]+/g, '').replace(/ea\./ig, '')),
-        weight: extractWeight(trimmed),
-        unitPrice: unitPrice,
-        availability: extractAvailability(trimmed).availability,
-        originalImages: []
-      });
+      const notePrefixMatch = text.match(/Line item note:\s*(.*)/i);
+      if (notePrefixMatch) {
+          currentItem.notes = (currentItem.notes ? currentItem.notes + ' ' : '') + notePrefixMatch[1].trim();
+      } else if (clean.length > 2) {
+           currentItem.desc += ' ' + cleanDescription(clean);
+      }
     }
   }
+  if (currentItem) items.push(currentItem);
   return items;
+}
+
+/** Parser for Industrial Parts Depot format */
+function parseIpdPage(textLines: {y: number, text: string}[]): QuoteItem[] {
+  const items: QuoteItem[] = [];
+  const itemStartRegex = /^(\d+)\s+([A-Z0-9\-/C]+)\s+/;
+  let currentItem: QuoteItem | null = null;
+
+  for (const { text } of textLines) {
+    const isItemLine = itemStartRegex.test(text) && text.includes('LBS') && /([\d,.]*\.\d{2})\s*$/.test(text);
+
+    if (isItemLine) {
+        if (currentItem) items.push(currentItem);
+        const match = text.match(itemStartRegex)!;
+        const qty = parseInt(match[1]);
+        const partNo = match[2];
+        let rest = text.substring(match[0].length);
+
+        const prices = rest.match(/([\d,.]*\.\d{2})\s+([\d,.]*\.\d{2})$/);
+        const unitPrice = prices ? parseFloat(prices[1].replace(/,/g, '')) : 0;
+        if (prices) rest = rest.replace(prices[0], '');
+
+        const weight = extractWeight(rest);
+        rest = rest.replace(/([\d\.]+)LBS/, '');
+        
+        rest = rest.replace(/\w{2}\s+\d{1,2}\/\d{1,2}\/\d{4}/, '').trim();
+
+        currentItem = {
+            qty,
+            partNo,
+            desc: cleanDescription(rest),
+            weight,
+            unitPrice,
+            originalImages: [],
+        };
+    } else if (currentItem && !text.match(/Subtotal|Total|Tax|Freight|Discount/i)) {
+        currentItem.desc += '\n' + text.trim();
+    }
+  }
+  if (currentItem) items.push(currentItem);
+  return items;
+}
+
+/** Parser for Costex format */
+function parseCostexPage(textLines: {y: number, text: string}[]): QuoteItem[] {
+    const items: QuoteItem[] = [];
+    const itemStartRegex = /^\d{4}\s+[A-Z0-9]+\s+/;
+
+    for (const { text } of textLines) {
+        if (!itemStartRegex.test(text)) continue;
+
+        const parts = text.split(/\s+/).filter(p => p);
+        if (parts.length < 5) continue;
+
+        const lineNo = parts[0];
+        const partNo = parts[1];
+        
+        const lineTotalStr = parts[parts.length - 1];
+        const netPriceStr = parts[parts.length - 2];
+        const qtyStr = parts[parts.length - 4];
+
+        const netPrice = parseFloat(netPriceStr.replace(/,/g, ''));
+        const lineTotal = parseFloat(lineTotalStr.replace(/,/g, ''));
+        if (isNaN(netPrice) || isNaN(lineTotal) || (netPrice === 0 && lineTotal === 0)) continue;
+
+        const qty = parseInt(qtyStr) || 1;
+        
+        let weight = 0;
+        let descParts: string[] = [];
+        let weightIndex = -1;
+        // Find weight: it's a float after the description
+        for (let i = 2; i < parts.length - 5; i++) {
+            if (!isNaN(parseFloat(parts[i])) && parts[i].includes('.')) {
+                weight = parseFloat(parts[i]);
+                weightIndex = i;
+                break;
+            }
+        }
+
+        if (weightIndex !== -1) {
+            descParts = parts.slice(2, weightIndex);
+        } else {
+            // Heuristic: description is up to the parts that are clearly not desc
+            let stopIndex = parts.length - 5;
+            descParts = parts.slice(2, stopIndex);
+        }
+
+        const desc = descParts.join(' ');
+        const availability = extractAvailability(text).availability;
+        
+        items.push({
+            lineNo,
+            qty,
+            partNo,
+            desc: cleanDescription(desc),
+            weight,
+            unitPrice: netPrice,
+            availability,
+            originalImages: [],
+        });
+    }
+    return items;
+}
+
+
+// --- Main Service Functions ---
+
+export const parseTextData = (text: string): QuoteItem[] => {
+  const lines = text.split('\n').map(line => ({ y: 0, text: line }));
+  
+  if (text.includes("RING POWER")) {
+      return parseRingPowerPage(lines);
+  }
+  if (text.includes("Industrial Parts Depot")) {
+      return parseIpdPage(lines);
+  }
+  if (text.includes("COSTEX TRACTOR")) {
+      return parseCostexPage(lines);
+  }
+  // Fallback to the most common format
+  return parseRingPowerPage(lines);
 };
+
 
 export const parseExcelFile = async (file: File): Promise<QuoteItem[]> => {
   const data = await file.arrayBuffer();
@@ -147,34 +288,37 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
   if (!window.pdfjsLib) {
     throw new Error("PDF Engine not loaded. Please refresh the page.");
   }
-
   const arrayBuffer = await file.arrayBuffer();
-  let pdf;
-  try {
-    pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-  } catch (e) {
-    console.error("PDF Load Error", e);
-    throw new Error("Could not read PDF structure.");
-  }
+  const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-  let items: QuoteItem[] = [];
-
+  let fullText = '';
   for (let i = 1; i <= pdf.numPages; i++) {
-    const itemYCoordinates: { item: QuoteItem, y: number }[] = [];
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
+    fullText += textContent.items.map((item: any) => item.str).join(' ');
+  }
 
-    const linesMap = new Map<number, any[]>();
+  let vendorParser: (textLines: {y: number, text: string}[]) => QuoteItem[];
+  if (fullText.includes("Industrial Parts Depot")) {
+    vendorParser = parseIpdPage;
+  } else if (fullText.includes("COSTEX TRACTOR")) {
+    vendorParser = parseCostexPage;
+  } else {
+    vendorParser = parseRingPowerPage; // Default/RingPower
+  }
+
+  let allItems: QuoteItem[] = [];
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const textContent = await page.getTextContent();
     
+    const linesMap = new Map<number, any[]>();
     textContent.items.forEach((item: any) => {
-      if (!item || !item.transform) return;
       const y = Math.round(item.transform[5]);
       let matchY: number | undefined;
       for (const key of linesMap.keys()) {
-        if (Math.abs(key - y) <= 4) { 
-          matchY = key;
-          break;
-        }
+        if (Math.abs(key - y) <= 4) { matchY = key; break; }
       }
       if (matchY === undefined) {
         matchY = y;
@@ -184,194 +328,73 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
     });
 
     const sortedY = Array.from(linesMap.keys()).sort((a, b) => b - a);
-    const textLines = sortedY.map(y => {
-      const itemsOnLine = linesMap.get(y)!.sort((a, b) => a.transform[4] - b.transform[4]);
-      return {
-        y,
-        text: itemsOnLine.map(it => it.str).join(' ').trim()
-      };
-    }).filter(l => l.text.length > 0);
+    const textLines = sortedY.map(y => ({
+      y,
+      text: linesMap.get(y)!.sort((a, b) => a.transform[4] - b.transform[4]).map(it => it.str).join(' ').trim()
+    })).filter(l => l.text.length > 0);
 
-    const itemStartRegex = /^\s*(\d+)[\)\.]\s+(\d+)\s+([A-Z0-9\-\.:\/]+)(.*)$/i;
-    let currentItem: QuoteItem | null = null;
-    let currentY = 0;
-
-    for (const lineObj of textLines) {
-      const text = lineObj.text;
-      if (text.match(/SUMMARY OF CHARGES|ORDER TOTAL|SUBTOTAL|TAX|PAGE|INVOICE|QUOTATION|RING POWER|Payment Information/i)) {
-        if (currentItem) { items.push(currentItem); itemYCoordinates.push({ item: currentItem, y: currentY }); currentItem = null; }
-        continue;
-      }
-
-      const startMatch = text.match(itemStartRegex);
-      
-      if (startMatch && !isDateString(startMatch[3])) {
-        if (currentItem) { items.push(currentItem); itemYCoordinates.push({ item: currentItem, y: currentY }); }
-
-        const rawPart = startMatch[3].replace(/:$/, '');
-        const initialDesc = cleanDescription(startMatch[4]);
-        const qty = parseInt(startMatch[2]);
-        
-        let unitPrice = 0;
-        const unitPriceMatch = text.match(/\$([0-9,]+\.[0-9]{2})\s*ea/i);
-        const allPriceMatches = Array.from(text.matchAll(/\$([0-9,]+\.[0-9]{2})/g));
-
-        if (unitPriceMatch) {
-            unitPrice = parseFloat(unitPriceMatch[1].replace(/,/g, ''));
-        } else if (allPriceMatches.length > 0 && qty > 0) {
-            const lineTotal = parseFloat(allPriceMatches[0][1].replace(/,/g, ''));
-            unitPrice = lineTotal / qty;
-        }
-        
-        currentItem = {
-           lineNo: startMatch[1],
-           qty: qty,
-           partNo: rawPart,
-           desc: initialDesc || "CAT COMPONENT",
-           weight: extractWeight(text),
-           unitPrice: unitPrice,
-           availability: extractAvailability(text).availability,
-           notes: '',
-           originalImages: []
-        };
-        currentY = lineObj.y;
-      } 
-      else if (currentItem) {
-        if (Math.abs(currentY - lineObj.y) > 300) {
-             items.push(currentItem); 
-             itemYCoordinates.push({ item: currentItem, y: currentY }); 
-             currentItem = null;
-             continue;
-        }
-
-        let tempItem = { ...currentItem };
-        if (tempItem.unitPrice === 0) {
-            const qty = tempItem.qty;
-            const unitPriceMatch = text.match(/\$([0-9,]+\.[0-9]{2})\s*ea/i);
-            const allPriceMatches = Array.from(text.matchAll(/\$([0-9,]+\.[0-9]{2})/g));
-
-            if (unitPriceMatch) {
-                tempItem.unitPrice = parseFloat(unitPriceMatch[1].replace(/,/g, ''));
-            } else if (allPriceMatches.length > 0 && qty > 0) {
-                const lineTotal = parseFloat(allPriceMatches[0][1].replace(/,/g, ''));
-                tempItem.unitPrice = lineTotal / qty;
-            }
-        }
-
-        if (!tempItem.availability) {
-            const av = extractAvailability(text);
-            if (av.availability) tempItem.availability = av.availability;
-        }
-
-        if (tempItem.weight === 0) {
-            const w = extractWeight(text);
-            if (w > 0) tempItem.weight = w;
-        }
-
-        const notePrefixMatch = text.match(/Line item note:\s*(.*)/i);
-        const replacesMatch = text.match(/(Replaces Part # .*)/i);
-        const nonReturnable = text.match(/(Non-returnable part)/i);
-
-        if (notePrefixMatch) {
-            tempItem.notes = (tempItem.notes ? tempItem.notes + ' ' : '') + notePrefixMatch[1].trim();
-        } else if (replacesMatch) {
-            tempItem.notes = (tempItem.notes ? tempItem.notes + ' ' : '') + replacesMatch[1].trim();
-        } else if (nonReturnable) {
-             tempItem.desc += '\n' + nonReturnable[1];
-        } else {
-             let clean = text;
-             clean = clean.replace(/\$[0-9,]+\.[0-9]{2}(?:\s*ea\.)?/gi, '');
-             clean = clean.replace(/All \d+ by [A-Za-z0-9 ]+/i, '').replace(/\d+ in stock/i, '').replace(/Contact Dealer/i, '');
-             clean = cleanDescription(clean);
-             if (clean.length > 2 && !clean.match(/^\d+\)$/)) { 
-                 tempItem.desc += ' ' + clean;
-             }
-        }
-        currentItem = tempItem;
-      }
-    }
-    if (currentItem) { items.push(currentItem); itemYCoordinates.push({ item: currentItem, y: currentY }); }
-
-    // --- Image Extraction Logic ---
+    const pageItems = vendorParser(textLines);
+    
+    // --- Image Extraction Logic for this page ---
     const opList = await page.getOperatorList();
-    const images = [];
+    const images: { key: string, y: number, x: number }[] = [];
     for (let j = 0; j < opList.fnArray.length; j++) {
       if (opList.fnArray[j] === window.pdfjsLib.OPS.paintImageXObject) {
-        const imgKey = opList.argsArray[j][0];
-        const currentTransform = opList.argsArray[j-1].slice(); // Heuristic: transform is often before paint
-        if(currentTransform && currentTransform.length === 6) {
-             images.push({ key: imgKey, y: currentTransform[5], x: currentTransform[4] });
+        const key = opList.argsArray[j][0];
+        const transform = opList.argsArray[j-1];
+        if (transform && transform.length === 6) {
+          images.push({ key, y: transform[5], x: transform[4] });
         }
       }
     }
+
+    const itemYCoordinates = textLines.map(line => {
+      const item = pageItems.find(p => line.text.includes(p.partNo));
+      return item ? { item, y: line.y } : null;
+    }).filter(Boolean) as { item: QuoteItem, y: number }[];
 
     for (const image of images) {
-      try {
-        const imgData = await page.objs.get(image.key);
-        if(!imgData || !imgData.data) continue;
-
         const canvas = document.createElement("canvas");
-        canvas.width = imgData.width;
-        canvas.height = imgData.height;
-        const ctx = canvas.getContext("2d");
-        if(!ctx) continue;
+        try {
+            const imgData = await page.objs.get(image.key);
+            if (!imgData || !imgData.data) continue;
+            
+            canvas.width = imgData.width;
+            canvas.height = imgData.height;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) continue;
+            
+            const imageData = ctx.createImageData(imgData.width, imgData.height);
+            if (imgData.kind === window.pdfjsLib.ImageKind.RGB_24BPP) {
+              let j = 0;
+              for (let k = 0; k < imgData.data.length; k += 3) {
+                  imageData.data[j++] = imgData.data[k];
+                  imageData.data[j++] = imgData.data[k + 1];
+                  imageData.data[j++] = imgData.data[k + 2];
+                  imageData.data[j++] = 255;
+              }
+            } else {
+              imageData.data.set(imgData.data);
+            }
+            ctx.putImageData(imageData, 0, 0);
 
-        const pixels = ctx.createImageData(imgData.width, imgData.height);
-        if (imgData.kind === window.pdfjsLib.ImageKind.GRAYSCALE_1BPP) {
-            let k = 0;
-            for (let i = 0; i < imgData.data.length; i++) {
-                const byte = imgData.data[i];
-                for (let bit = 7; bit >= 0; bit--) {
-                    const monotoken = (byte >> bit) & 1;
-                    const color = monotoken === 0 ? 255 : 0;
-                    pixels.data[k++] = color;
-                    pixels.data[k++] = color;
-                    pixels.data[k++] = color;
-                    pixels.data[k++] = 255;
+            const dataUrl = canvas.toDataURL();
+            let closestItem = null;
+            let minDiff = Infinity;
+            for (const { item, y } of itemYCoordinates) {
+                const diff = Math.abs(y - image.y);
+                if (diff < minDiff && diff < 50) {
+                    minDiff = diff;
+                    closestItem = item;
                 }
             }
-        } else if(imgData.kind === window.pdfjsLib.ImageKind.RGB_24BPP) {
-            let k = 0;
-            for (let i = 0; i < imgData.data.length; i += 3) {
-                pixels.data[k++] = imgData.data[i];
-                pixels.data[k++] = imgData.data[i+1];
-                pixels.data[k++] = imgData.data[i+2];
-                pixels.data[k++] = 255;
+            if (closestItem && closestItem.originalImages) {
+                closestItem.originalImages.push(dataUrl);
             }
-        } else if(imgData.kind === window.pdfjsLib.ImageKind.RGBA_32BPP) {
-            let k = 0;
-            for (let i = 0; i < imgData.data.length; i += 4) {
-                pixels.data[k++] = imgData.data[i];
-                pixels.data[k++] = imgData.data[i+1];
-                pixels.data[k++] = imgData.data[i+2];
-                pixels.data[k++] = imgData.data[i+3];
-            }
-        } else {
-            pixels.data.set(new Uint8ClampedArray(imgData.data));
-        }
-        ctx.putImageData(pixels, 0, 0);
-
-        const dataUrl = canvas.toDataURL();
-
-        // Associate image with the closest item by Y-coordinate
-        let closestItem = null;
-        let minDiff = Infinity;
-        for (const itemCoord of itemYCoordinates) {
-            const diff = Math.abs(itemCoord.y - image.y);
-            if (diff < minDiff && diff < 50) { // 50px tolerance
-                minDiff = diff;
-                closestItem = itemCoord.item;
-            }
-        }
-        if (closestItem && closestItem.originalImages) {
-            closestItem.originalImages.push(dataUrl);
-        }
-      } catch (e) {
-        console.warn(`Could not resolve image object '${image.key}':`, e);
-        // Continue to next image if one fails
-      }
+        } catch(e) { console.warn(`Could not process image ${image.key}:`, e); }
     }
+    allItems.push(...pageItems);
   }
 
-  return items;
+  return allItems;
 };
