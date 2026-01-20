@@ -120,8 +120,7 @@ function parseRingPowerPage(textLines: {y: number, text: string}[]): { items: Qu
       };
       currentY = lineObj.y;
     } else if (currentItem) {
-      // Tighter multi-line tracking (approx 80 points)
-      if (Math.abs(currentY - lineObj.y) > 85) { 
+      if (Math.abs(currentY - lineObj.y) > 90) { 
         items.push(currentItem); 
         yCoords.push(currentY); 
         currentItem = null; 
@@ -143,7 +142,6 @@ function parseRingPowerPage(textLines: {y: number, text: string}[]): { items: Qu
 function parseCostexPage(textLines: {y: number, text: string}[]): { items: QuoteItem[], yCoords: number[] } {
   const items: QuoteItem[] = [];
   const yCoords: number[] = [];
-  // 0003 4484218 KIT-BEARING (0.25 1.71 In Stock 01 6 6 318.41 50.28 301.68
   const itemRegex = /^\s*(\d{4})\s+(\S+)\s+(.+?)\s+(\d+\.\d+)\s+(.*?)\s+(\d+)\s+(\d+)\s+([\d,\.]+)\s+([\d,\.]+)\s+([\d,\.]+)$/i;
 
   for (const lineObj of textLines) {
@@ -221,7 +219,7 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
     const isCostex = pageText.includes("COSTEX") || pageText.includes("CTP");
     const { items: pageItems, yCoords } = isCostex ? parseCostexPage(textLines) : parseRingPowerPage(textLines);
 
-    // High-fidelity image extraction
+    // Image extraction logic
     const images: { y: number, dataUrl: string }[] = [];
     const operatorList = await page.getOperatorList();
     const { fnArray, argsArray } = operatorList;
@@ -253,6 +251,7 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
               const data = imgData.data;
               const pixels = imageData.data;
               
+              // Map PDF pixel data (RGB, RGBA, or Grayscale) to Canvas pixels
               if (data.length === imgData.width * imgData.height * 3) {
                 for (let p = 0, q = 0; p < data.length; p += 3, q += 4) {
                   pixels[q] = data[p];
@@ -280,14 +279,14 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
       }
     }
 
-    // Associate images with items
+    // High-precision coordinate association
     pageItems.forEach((item, idx) => {
       const itemY = yCoords[idx];
       let bestImg = null;
       let minDiff = Infinity;
       images.forEach(img => {
         const diff = Math.abs(img.y - itemY);
-        if (diff < minDiff && diff < 80) { 
+        if (diff < minDiff && diff < 100) { 
           minDiff = diff; 
           bestImg = img.dataUrl; 
         }
