@@ -121,7 +121,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
                      <td className="p-3 flex gap-4">
                         {config.photoMode !== 'none' && (
                            <div className="w-20 h-20 flex-shrink-0 bg-white border border-slate-200 flex items-center justify-center overflow-hidden rounded-lg shadow-sm">
-                               <PartImage partNo={item.partNo} description={item.desc} photoMode={config.photoMode} originalImages={item.originalImages} />
+                               <PartImage partNo={item.partNo} description={item.desc} photoMode={config.photoMode} imageSize={config.imageSize} originalImages={item.originalImages} />
                            </div>
                         )}
                         <div className="flex flex-col justify-center">
@@ -175,10 +175,10 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
 
       {/* Visible Hub Disclaimer & Legal Footnote */}
       <div className="print-footer mt-auto pt-16 border-t border-slate-200 mt-20 block bg-white pb-8">
-         <div className="max-w-2xl mx-auto text-center">
-             <h4 className="font-black uppercase text-[10px] mb-4 text-slate-900 tracking-[0.4em]">TERMS OF DISPATCH & WARRANTY LIMITATIONS</h4>
+         <div className="max-w-3xl mx-auto text-center">
+             <h4 className="font-black uppercase text-[10px] mb-4 text-slate-900 tracking-[0.4em]">TERMS, WARRANTY & RETURNS POLICY</h4>
              <p className="italic mb-6 text-slate-500 whitespace-pre-wrap text-[9px] text-justify leading-relaxed px-4">
-                NEW PARTS TERMS / WARRANTY DISCLAIMER / LIMITATION OF LIABILITY: All components distributed by American Iron LLC are verified factory-new. Except where explicitly guaranteed in separate engineering documents, Seller disclaims all warranties, express or implied, including merchantability and fitness for mission-critical operations. Warranty coverage (if applicable) remains the sole jurisdiction of the OEM manufacturer. Seller assumes no liability for consequential downtime, secondary failure, or incidental damage arising from part deployment. Final validation of part compatibility rests with the customer's engineering team.
+                Terms, Warranty & Returns Policy Identification & Classification: Quotes and invoices from American Iron LLC may include both genuine OEM and aftermarket replacement parts, heavy equipment, or power systems. All manufacturer names, symbols, and part numbers are used for identification and reference purposes only; it is not implied that any item is the product of these manufacturers unless specifically labeled as "Genuine." Warranty & Liability: Genuine items are subject to the original manufacturer’s warranty. Aftermarket items are sold "as-is" unless a separate written warranty is provided. American Iron LLC disclaims all implied warranties of merchantability and shall not be liable for labor, travel, equipment downtime, or consequential damages arising from the use or failure of any supplied item. Parts Return Policy: Returns apply strictly to parts only and must be pre-authorized within [30] days of invoice. Restocking: All returned parts are subject to a 20% restocking fee and must be in original, uninstalled condition. Exclusions: Special orders, electrical components, and used equipment or power systems are sold Final Sale. Services: No returns or credits are issued for service labor, freight, or diagnostic fees.
              </p>
              <div className="text-[8px] font-black text-slate-300 tracking-[0.8em] uppercase flex items-center justify-center gap-6">
                  <span>SECURE HUB</span>

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
@@ -64,7 +65,8 @@ const App: React.FC = () => {
     isInvoice: false,
     weightUnit: 'LBS',
     includeAiAnalysis: false,
-    photoMode: PhotoMode.EXTRACT, // AI Image Gen is off by default
+    photoMode: PhotoMode.EXTRACT, 
+    imageSize: '1K', // Requirement 2: Size selection default
     paymentTerms: 'Net 30',
     shippingCompany: '',
     shippingPhone: '',

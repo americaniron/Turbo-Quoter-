@@ -1,15 +1,17 @@
+
 import React, { useEffect, useState } from 'react';
 import { generatePartImage } from '../services/geminiService.ts';
-import { PhotoMode } from '../types.ts';
+import { PhotoMode, AppConfig } from '../types.ts';
 
 interface PartImageProps {
   partNo: string;
   description: string;
   photoMode: PhotoMode;
+  imageSize: '1K' | '2K' | '4K';
   originalImages?: string[];
 }
 
-export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photoMode, originalImages }) => {
+export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photoMode, imageSize, originalImages }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [attempted, setAttempted] = useState(false);
@@ -37,7 +39,7 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photo
       if (photoMode === PhotoMode.AI) {
         setLoading(true);
         try {
-          const url = await generatePartImage(partNo, description);
+          const url = await generatePartImage(partNo, description, imageSize);
           setImageUrl(url);
         } catch (e) {
           console.error("AI Generation failure for item:", partNo);
@@ -51,7 +53,7 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photo
     const timer = setTimeout(processImage, Math.random() * 300);
     return () => clearTimeout(timer);
 
-  }, [photoMode, partNo, description, originalImages, attempted]);
+  }, [photoMode, partNo, description, originalImages, attempted, imageSize]);
 
   if (loading) {
     return (

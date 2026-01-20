@@ -1,6 +1,8 @@
+
 import React, { useState, useRef } from 'react';
 import { AppConfig, ClientInfo, ParseMode, QuoteItem, SavedClient, User, PhotoMode } from '../types.ts';
 import { parseTextData, parsePdfFile, parseExcelFile } from '../services/parserService.ts';
+import { analyzePartPhoto } from '../services/geminiService.ts';
 import { Logo } from './Logo.tsx';
 
 interface ConfigPanelProps {
@@ -56,9 +58,15 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
   const [showShipping, setShowShipping] = useState(false);
   const [showAddressBook, setShowAddressBook] = useState(false);
   const [bookSearch, setBookSearch] = useState("");
+  
+  // Vision Lab State
+  const [visionResult, setVisionResult] = useState<string | null>(null);
+  const [isVisionLoading, setIsVisionLoading] = useState(false);
+
   const logoInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const excelInputRef = useRef<HTMLInputElement>(null);
+  const visionInputRef = useRef<HTMLInputElement>(null);
 
   const handleProcess = async () => {
     setStatus("Processing...");
@@ -118,6 +126,22 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
       reader.onload = (ev) => {
         const base64 = ev.target?.result as string;
         onLogoUpload(base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleVisionUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setIsVisionLoading(true);
+      setVisionResult(null);
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const base64 = ev.target?.result as string;
+        const result = await analyzePartPhoto(base64, file.type);
+        setVisionResult(result);
+        setIsVisionLoading(false);
       };
       reader.readAsDataURL(file);
     }
@@ -363,7 +387,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                disabled={itemsCount === 0}
                className={`text-[11px] font-black uppercase px-10 py-5 rounded-[1.5rem] transition-all active:scale-95 shadow-xl flex items-center gap-3 ${itemsCount > 0 ? 'bg-[#ffcd00] text-slate-900 hover:bg-white' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}
              >
-               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 00-2 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
                Export Data (JSON)
              </button>
              <button onClick={() => document.getElementById('loadQuoteInput')?.click()} className="bg-slate-800 text-white text-[11px] font-black uppercase px-10 py-5 rounded-[1.5rem] hover:bg-slate-700 transition-all border border-slate-700 flex items-center gap-3">
@@ -426,7 +450,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6 mb-16">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 mb-16">
         <FieldGroup label="Pricing Markup" isDark>
             <select value={config.markupPercentage} onChange={(e) => updateConfig('markupPercentage', parseInt(e.target.value))} className="w-full p-5 bg-slate-900 text-[#ffcd00] text-[14px] font-black rounded-[1.5rem] border-2 border-slate-800 focus:border-indigo-600 outline-none appearance-none cursor-pointer">
                 {markupOptions.map(opt => <option key={opt} value={opt}>{opt}% MARGIN</option>)}
@@ -479,19 +503,60 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
                 <button onClick={() => updateConfig('photoMode', PhotoMode.NONE)} className={`flex-1 py-3 rounded-xl transition-all ${config.photoMode === PhotoMode.NONE ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-white'}`}>NONE</button>
             </div>
         </FieldGroup>
+        {/* Nano Banana Pro Affordance - Requirement 2 */}
+        <FieldGroup label="AI Image Size" isDark>
+            <div className="flex bg-slate-900 p-2 rounded-[1.5rem] border-2 border-slate-800 h-full text-[10px] font-black">
+                {['1K', '2K', '4K'].map(size => (
+                    <button 
+                        key={size}
+                        onClick={() => updateConfig('imageSize', size)} 
+                        className={`flex-1 py-3 rounded-xl transition-all ${config.imageSize === size ? 'bg-[#ffcd00] text-black shadow-lg' : 'text-slate-500 hover:text-white'}`}
+                    >
+                        {size}
+                    </button>
+                ))}
+            </div>
+        </FieldGroup>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 items-center bg-slate-50/50 p-8 rounded-[3rem] border-2 border-slate-100">
-        <button onClick={onAnalyze} disabled={isAnalyzing} className="md:col-span-2 bg-slate-950 text-white font-black text-sm py-8 rounded-[2.5rem] uppercase tracking-[0.3em] flex items-center justify-center gap-5 transition-all hover:bg-indigo-600 hover:-translate-y-1 active:scale-95 shadow-2xl">
-            {isAnalyzing ? <div className="w-6 h-6 border-4 border-slate-400 border-t-white rounded-full animate-spin"></div> : <svg className="w-7 h-7 text-[#ffcd00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>}
-            Technical Analysis Engine
-        </button>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 items-start bg-slate-50/50 p-8 rounded-[3rem] border-2 border-slate-100">
+        <div className="md:col-span-2 flex flex-col gap-6">
+            <button onClick={onAnalyze} disabled={isAnalyzing} className="w-full bg-slate-950 text-white font-black text-sm py-8 rounded-[2.5rem] uppercase tracking-[0.3em] flex items-center justify-center gap-5 transition-all hover:bg-indigo-600 hover:-translate-y-1 active:scale-95 shadow-2xl">
+                {isAnalyzing ? <div className="w-6 h-6 border-4 border-slate-400 border-t-white rounded-full animate-spin"></div> : <svg className="w-7 h-7 text-[#ffcd00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>}
+                Engineering Diagnostic Analysis
+            </button>
+            
+            {/* AI Vision Analysis Lab - Requirement 3 */}
+            <div className="bg-white p-8 rounded-[2rem] border-2 border-slate-100 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-600">AI Vision Lab - Part Identification</h4>
+                    <span className="text-[8px] bg-slate-900 text-white px-3 py-1 rounded-full font-black tracking-widest">GEMINI PRO 3.0</span>
+                </div>
+                <div className="flex gap-4 items-center">
+                    <button 
+                        onClick={() => visionInputRef.current?.click()}
+                        className="bg-slate-50 text-slate-900 border-2 border-slate-200 px-6 py-4 rounded-xl text-[10px] font-black uppercase hover:bg-indigo-50 hover:border-indigo-200 transition-all flex items-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path></svg>
+                        Scan Part Photo
+                    </button>
+                    <input type="file" ref={visionInputRef} className="hidden" accept="image/*" onChange={handleVisionUpload} />
+                    {isVisionLoading && <div className="w-4 h-4 border-2 border-slate-200 border-t-indigo-600 rounded-full animate-spin"></div>}
+                </div>
+                {visionResult && (
+                    <div className="mt-6 p-5 bg-slate-950 text-[#ffcd00] font-mono text-[11px] rounded-xl border-l-4 border-indigo-500 animate-in fade-in slide-in-from-top-2">
+                        <p className="leading-relaxed">{visionResult}</p>
+                    </div>
+                )}
+            </div>
+        </div>
+        
         <button 
           onClick={onEmailDispatch}
           disabled={itemsCount === 0 || !client.email}
-          className={`bg-indigo-600 text-white font-black text-sm py-8 rounded-[2.5rem] uppercase tracking-[0.3em] flex items-center justify-center gap-5 transition-all hover:bg-white hover:text-indigo-600 border-4 border-transparent hover:border-indigo-600 hover:-translate-y-1 active:scale-95 shadow-2xl ${itemsCount === 0 || !client.email ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+          className={`h-full bg-indigo-600 text-white font-black text-sm py-12 rounded-[2.5rem] uppercase tracking-[0.3em] flex flex-col items-center justify-center gap-6 transition-all hover:bg-white hover:text-indigo-600 border-4 border-transparent hover:border-indigo-600 hover:-translate-y-1 active:scale-95 shadow-2xl ${itemsCount === 0 || !client.email ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
         >
-          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+          <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
           Dispatch Protocol
         </button>
       </div>
@@ -509,7 +574,7 @@ export const ConfigPanel: React.FC<ConfigPanelProps> = ({
           className={`flex-1 rounded-[2.5rem] font-black uppercase text-[12px] tracking-[0.2em] border-4 transition-all shadow-xl flex items-center justify-center gap-4 ${itemsCount > 0 ? 'bg-white text-slate-900 border-slate-950 hover:bg-slate-50 hover:-translate-y-1 active:scale-95' : 'bg-slate-100 text-slate-300 border-slate-200 cursor-not-allowed'}`}
         >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-            Print / Save PDF
+            Print Manifest
         </button>
       </div>
     </div>

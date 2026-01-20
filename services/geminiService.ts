@@ -1,27 +1,14 @@
+
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuoteItem, ClientInfo, AppConfig, EmailDraft } from "../types.ts";
-
-/**
- * Safe retrieval of API Key from supported environments.
- */
-const getApiKey = (): string | undefined => {
-  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-    return process.env.API_KEY;
-  }
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.VITE_API_KEY) {
-    return (import.meta as any).env.VITE_API_KEY;
-  }
-  return undefined;
-};
 
 /**
  * AI Brainstorming/Analysis using Gemini 3 Pro for complex reasoning.
  */
 export const analyzeQuoteData = async (items: QuoteItem[]): Promise<string> => {
-  const apiKey = getApiKey();
-  if (!apiKey) return "AI services offline: API Key not configured.";
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Use process.env.API_KEY directly as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
     const context = items.map((i, idx) => `Line ${(idx + 1).toString().padStart(2, '0')}: ${i.qty}x ${i.partNo} (${i.desc})`).join("\n");
@@ -48,6 +35,7 @@ export const analyzeQuoteData = async (items: QuoteItem[]): Promise<string> => {
       }
     });
 
+    // Accessing text as a property
     return response.text || "Diagnostic analysis yielded no specific concerns.";
   } catch (error) {
     console.error("Analysis Error:", error);
@@ -64,18 +52,10 @@ export const generateEmailDraft = async (
   items: QuoteItem[],
   tone: string = "professional"
 ): Promise<EmailDraft> => {
-  const apiKey = getApiKey();
   const type = config.isInvoice ? "Invoice" : "Quotation";
   
-  if (!apiKey) {
-      return {
-          to: client.email,
-          subject: `American Iron: ${type} ${config.quoteId}`,
-          body: `Hello ${client.contactName},\n\nPlease find the attached ${type} for your review.\n\nRegards,\nAmerican Iron Team`
-        };
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Use process.env.API_KEY directly as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const itemsContext = items.map((i, idx) => `${(idx + 1).toString().padStart(2, '0')}. ${i.qty}x ${i.partNo}`).join(", ");
 
@@ -113,6 +93,7 @@ export const generateEmailDraft = async (
       }
     });
     
+    // Accessing text as a property
     return JSON.parse(response.text || "{}") as EmailDraft;
   } catch (error) {
     return {
@@ -124,51 +105,74 @@ export const generateEmailDraft = async (
 };
 
 /**
- * Generates an exact part photo using Imagen 4.0 or Gemini Pro Image.
+ * Generates an exact part photo using Gemini 3 Pro Image (Nano Banana Pro).
  */
-export const generatePartImage = async (partNo: string, description: string): Promise<string | null> => {
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
-
+export const generatePartImage = async (partNo: string, description: string, size: '1K' | '2K' | '4K' = '1K'): Promise<string | null> => {
   const cleanDesc = description.replace(/CAT COMPONENT|CAT PART|ASSEMBLY/gi, '').trim();
   const prompt = `Highly detailed industrial product catalog photograph of Caterpillar heavy machinery part ${partNo}. ${cleanDesc}. Isolated on pure white background, studio lighting, professional 8k resolution.`;
 
   try {
-    if (typeof window !== 'undefined' && (window as any).aistudio) {
-        if (!(await (window as any).aistudio.hasSelectedApiKey())) {
-            await (window as any).aistudio.openSelectKey();
+    // API Key Selection check mandatory for gemini-3-pro-image-preview
+    if (typeof window !== 'undefined' && window.aistudio) {
+        if (!(await window.aistudio.hasSelectedApiKey())) {
+            await window.aistudio.openSelectKey();
         }
     }
 
-    const ai = new GoogleGenAI({ apiKey });
+    // Create a new GoogleGenAI instance right before making an API call
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-    try {
-        const response = await ai.models.generateImages({
-            model: 'imagen-4.0-generate-001',
-            prompt: prompt,
-            config: {
-                numberOfImages: 1,
-                aspectRatio: '1:1',
-                outputMimeType: 'image/jpeg'
-            }
-        });
-        const b64 = response.generatedImages?.[0]?.image?.imageBytes;
-        return b64 ? `data:image/jpeg;base64,${b64}` : null;
-    } catch (err) {
-        const genResponse = await ai.models.generateContent({
-            model: 'gemini-3-pro-image-preview',
-            contents: { parts: [{ text: prompt }] },
-            config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
-        });
-        
-        for (const part of genResponse.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-                return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            }
-        }
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-image-preview',
+      contents: { parts: [{ text: prompt }] },
+      config: { 
+        imageConfig: { 
+          aspectRatio: "1:1", 
+          imageSize: size 
+        } 
+      }
+    });
+    
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Image generation hub error:", error);
+    // Reset key selection if requested entity not found
+    if (error.message?.includes("Requested entity was not found.") && typeof window !== 'undefined' && window.aistudio) {
+        await window.aistudio.openSelectKey();
+    }
   }
   return null;
+};
+
+/**
+ * Analyzes an uploaded photo using Gemini 3 Pro.
+ */
+export const analyzePartPhoto = async (base64Data: string, mimeType: string): Promise<string> => {
+  // Create a new GoogleGenAI instance right before making an API call
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: {
+        parts: [
+          { inlineData: { mimeType, data: base64Data.split(',')[1] || base64Data } },
+          { text: "Analyze this heavy machinery part. Identify the component, evaluate its condition if visible, and suggest relevant Caterpillar part numbers or maintenance steps." }
+        ]
+      },
+      config: {
+        thinkingConfig: { thinkingBudget: 1024 }
+      }
+    });
+
+    // Accessing text as a property
+    return response.text || "No analysis generated for this image.";
+  } catch (error) {
+    console.error("Vision Analysis Error:", error);
+    return "The vision engineering hub is currently offline.";
+  }
 };

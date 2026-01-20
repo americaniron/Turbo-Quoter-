@@ -52,6 +52,7 @@ export interface AppConfig {
   weightUnit: 'LBS' | 'KG';
   includeAiAnalysis: boolean; 
   photoMode: PhotoMode;
+  imageSize: '1K' | '2K' | '4K';
   paymentTerms?: string;
   specialInstructions?: string;
   shippingCompany?: string;
@@ -75,10 +76,19 @@ export enum ParseMode {
   EXCEL = 'excel'
 }
 
+// Define the AIStudio interface to match the environment's expected named type
+export interface AIStudio {
+  hasSelectedApiKey: () => Promise<boolean>;
+  openSelectKey: () => Promise<void>;
+}
+
+// Fixed Window interface capitalization and added aistudio members
 declare global {
   interface Window {
     pdfjsLib: any;
     pdfjsLibUrl?: string;
     XLSX: any;
+    // Fix: Use the named AIStudio type and mark it as optional (?) to match the environment's global declaration
+    aistudio?: AIStudio;
   }
 }
