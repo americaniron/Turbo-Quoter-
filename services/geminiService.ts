@@ -123,23 +123,10 @@ export const generateEmailDraft = async (
   }
 };
 
-// --- Image Generation with Rate Limiting ---
-
-const imageRequestQueue: {
-    partNo: string;
-    description: string;
-    resolve: (value: string | null) => void;
-    reject: (reason?: any) => void;
-}[] = [];
-
-let isProcessingQueue = false;
-// Google's default is 20 req/min for gemini-pro-image. 60s / 20 = 3s/req. 3.5s is safer.
-const REQUEST_INTERVAL = 3500; 
-
 /**
- * The internal, unthrottled image generation function. This is the original implementation.
+ * Generates an exact part photo using Imagen 4.0 or Gemini Pro Image.
  */
-const _internalGeneratePartImage = async (partNo: string, description: string): Promise<string | null> => {
+export const generatePartImage = async (partNo: string, description: string): Promise<string | null> => {
   const apiKey = getApiKey();
   if (!apiKey) return null;
 
@@ -182,45 +169,6 @@ const _internalGeneratePartImage = async (partNo: string, description: string): 
     }
   } catch (error) {
     console.error("Image generation hub error:", error);
-    // Re-throw to allow the queue promise to be rejected, alerting the component.
-    throw error;
   }
   return null;
-};
-
-/**
- * Processes the image generation queue with a delay between requests to avoid rate limiting.
- */
-const processImageRequestQueue = async () => {
-    if (isProcessingQueue) return;
-    isProcessingQueue = true;
-
-    while (imageRequestQueue.length > 0) {
-        const request = imageRequestQueue.shift();
-        if (request) {
-            try {
-                const imageUrl = await _internalGeneratePartImage(request.partNo, request.description);
-                request.resolve(imageUrl);
-            } catch (error) {
-                request.reject(error);
-            }
-            // Wait for the specified interval before the next API call.
-            await new Promise(resolve => setTimeout(resolve, REQUEST_INTERVAL));
-        }
-    }
-
-    isProcessingQueue = false;
-};
-
-/**
- * Public-facing function to queue an image generation request.
- * This prevents firing too many API calls at once and hitting rate limits.
- */
-export const generatePartImage = (partNo: string, description: string): Promise<string | null> => {
-    return new Promise((resolve, reject) => {
-        imageRequestQueue.push({ partNo, description, resolve, reject });
-        if (!isProcessingQueue) {
-            processImageRequestQueue();
-        }
-    });
 };

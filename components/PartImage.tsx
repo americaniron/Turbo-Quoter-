@@ -37,19 +37,13 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photo
       // Fallback to AI generation for EXTRACT mode (if no images were found) or for explicit AI mode.
       if (photoMode === PhotoMode.EXTRACT || photoMode === PhotoMode.AI) {
         setLoading(true);
-        try {
-          const url = await generatePartImage(partNo, description);
-          setImageUrl(url);
-        } catch (err) {
-          console.error(`Image generation request failed for part ${partNo}:`, err);
-        } finally {
-          setLoading(false);
-        }
+        const url = await generatePartImage(partNo, description);
+        setImageUrl(url);
+        setLoading(false);
       }
     };
     
-    // Using a timeout to stagger when items are added to the queue.
-    // The queue itself handles the rate limiting between API calls.
+    // Using a timeout to stagger API calls for multiple items
     const timer = setTimeout(processImage, Math.random() * 500);
     return () => clearTimeout(timer);
 
