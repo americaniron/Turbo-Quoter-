@@ -27,7 +27,6 @@ const App: React.FC = () => {
 
   const [items, setItems] = useState<QuoteItem[]>([]);
   
-  // Requirement 1 & 6: Global key for address book to prevent erasure and share between modes
   const GLOBAL_BOOK_KEY = 'american_iron_global_address_book';
   
   const [addressBook, setAddressBook] = useState<SavedClient[]>(() => {
@@ -36,7 +35,6 @@ const App: React.FC = () => {
       try {
         return JSON.parse(savedBook);
       } catch (e) {
-        console.error("Failed to parse address book from localStorage", e);
         return [];
       }
     }
@@ -66,7 +64,7 @@ const App: React.FC = () => {
     isInvoice: false,
     weightUnit: 'LBS',
     includeAiAnalysis: false,
-    photoMode: PhotoMode.EXTRACT,
+    photoMode: PhotoMode.EXTRACT, // AI Image Gen is off by default
     paymentTerms: 'Net 30',
     shippingCompany: '',
     shippingPhone: '',
@@ -87,20 +85,11 @@ const App: React.FC = () => {
 
   const getStorageKey = (base: string) => user ? `${base}_${user.username}` : base;
 
-  // Requirement 4 & 5: Force print title settings
   useEffect(() => {
-    const handleBeforePrint = () => {
-      document.title = "AMERICAN IRON LLC BILLING HUB";
-    };
-    const handleAfterPrint = () => {
-      document.title = "AMERICAN IRON LLC BILLING HUB";
-    };
+    document.title = "AMERICAN IRON LLC BILLING HUB";
+    const handleBeforePrint = () => { document.title = "AMERICAN IRON LLC BILLING HUB"; };
     window.addEventListener('beforeprint', handleBeforePrint);
-    window.addEventListener('afterprint', handleAfterPrint);
-    return () => {
-      window.removeEventListener('beforeprint', handleBeforePrint);
-      window.removeEventListener('afterprint', handleAfterPrint);
-    };
+    return () => window.removeEventListener('beforeprint', handleBeforePrint);
   }, []);
 
   useEffect(() => {
@@ -110,10 +99,7 @@ const App: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    // Persist address book globally whenever it changes
-    if (addressBook.length > 0 || localStorage.getItem(GLOBAL_BOOK_KEY)) {
-      localStorage.setItem(GLOBAL_BOOK_KEY, JSON.stringify(addressBook));
-    }
+    localStorage.setItem(GLOBAL_BOOK_KEY, JSON.stringify(addressBook));
   }, [addressBook]);
 
   const handleLogin = (u: User) => {
@@ -173,7 +159,7 @@ const App: React.FC = () => {
     }
 
     try {
-        const data = { version: '1.7', author: user?.username, timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
+        const data = { version: '1.9', author: user?.username, timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
         const json = JSON.stringify(data, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -212,7 +198,7 @@ const App: React.FC = () => {
         setAiAnalysis(json.aiAnalysis || null);
         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       } catch (err) {
-        alert("Failed to load JSON file. File may be corrupted or incompatible.");
+        alert("Failed to load JSON file.");
       }
     };
     reader.readAsText(file);

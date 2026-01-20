@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { generatePartImage } from '../services/geminiService.ts';
 import { PhotoMode } from '../types.ts';
@@ -16,35 +15,41 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photo
   const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
-    // Reset state when props change
+    // Reset state when props change to ensure clean reload
     setImageUrl(null);
     setLoading(false);
     setAttempted(false);
-  }, [partNo, description, photoMode, originalImages]);
+  }, [partNo, photoMode]);
 
   useEffect(() => {
-    if (attempted) return;
+    if (attempted || photoMode === PhotoMode.NONE) return;
 
     const processImage = async () => {
       setAttempted(true);
       
-      // In EXTRACT mode, prioritize original/extracted images.
-      if (photoMode === PhotoMode.EXTRACT && originalImages && originalImages.length > 0) {
+      // 1. Prioritize Extracted Images in all active modes
+      if (originalImages && originalImages.length > 0) {
         setImageUrl(originalImages[0]);
-        return; // Image found, no need to proceed to AI generation.
+        return; 
       }
 
-      // Fallback to AI generation for EXTRACT mode (if no images were found) or for explicit AI mode.
-      if (photoMode === PhotoMode.EXTRACT || photoMode === PhotoMode.AI) {
+      // 2. Only Generate AI Images if explicitly in AI Mode
+      // EXTRACT mode now acts as 'Extract Only' with no fallback, as requested.
+      if (photoMode === PhotoMode.AI) {
         setLoading(true);
-        const url = await generatePartImage(partNo, description);
-        setImageUrl(url);
-        setLoading(false);
+        try {
+          const url = await generatePartImage(partNo, description);
+          setImageUrl(url);
+        } catch (e) {
+          console.error("AI Generation failed for item", partNo);
+        } finally {
+          setLoading(false);
+        }
       }
     };
     
-    // Using a timeout to stagger API calls for multiple items
-    const timer = setTimeout(processImage, Math.random() * 500);
+    // Slight delay to stagger network requests for bulk lists
+    const timer = setTimeout(processImage, Math.random() * 400);
     return () => clearTimeout(timer);
 
   }, [photoMode, partNo, description, originalImages, attempted]);
@@ -65,11 +70,11 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photo
     );
   }
 
-  // Fallback / Placeholder
+  // Placeholder / Default branding view
   return (
-    <div className="w-full h-full bg-slate-50 flex items-center justify-center text-center p-1">
+    <div className="w-full h-full bg-slate-50 flex items-center justify-center text-center p-1 border border-slate-100 rounded">
       <span className="text-[9px] font-black text-slate-300 uppercase leading-tight">
-        CAT<br/>{partNo.substring(0, 5)}
+        IRON<br/>{partNo.substring(0, 5)}
       </span>
     </div>
   );
