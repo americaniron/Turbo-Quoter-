@@ -15,11 +15,11 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photo
   const [attempted, setAttempted] = useState(false);
 
   useEffect(() => {
-    // Reset state when props change to ensure clean reload
+    // Reset state when core props change
     setImageUrl(null);
     setLoading(false);
     setAttempted(false);
-  }, [partNo, photoMode]);
+  }, [partNo]);
 
   useEffect(() => {
     if (attempted || photoMode === PhotoMode.NONE) return;
@@ -27,29 +27,28 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photo
     const processImage = async () => {
       setAttempted(true);
       
-      // 1. Prioritize Extracted Images in all active modes
+      // 1. Mandatory Priority: Use extracted PDF images if present
       if (originalImages && originalImages.length > 0) {
         setImageUrl(originalImages[0]);
         return; 
       }
 
-      // 2. Only Generate AI Images if explicitly in AI Mode
-      // EXTRACT mode now acts as 'Extract Only' with no fallback, as requested.
+      // 2. Fallback: Only invoke AI generation if no PDF image exists and mode allows
       if (photoMode === PhotoMode.AI) {
         setLoading(true);
         try {
           const url = await generatePartImage(partNo, description);
           setImageUrl(url);
         } catch (e) {
-          console.error("AI Generation failed for item", partNo);
+          console.error("AI Generation failed for part", partNo);
         } finally {
           setLoading(false);
         }
       }
     };
     
-    // Slight delay to stagger network requests for bulk lists
-    const timer = setTimeout(processImage, Math.random() * 400);
+    // Slight staggered delay for UI smoothness in long lists
+    const timer = setTimeout(processImage, Math.random() * 300);
     return () => clearTimeout(timer);
 
   }, [photoMode, partNo, description, originalImages, attempted]);
@@ -65,12 +64,16 @@ export const PartImage: React.FC<PartImageProps> = ({ partNo, description, photo
   if (imageUrl) {
     return (
       <div className="w-full h-full bg-white flex items-center justify-center overflow-hidden">
-        <img src={imageUrl} alt={partNo} className="max-w-full max-h-full object-contain" />
+        <img 
+          src={imageUrl} 
+          alt={`Part ${partNo}`} 
+          className="max-w-full max-h-full object-contain" 
+        />
       </div>
     );
   }
 
-  // Placeholder / Default branding view
+  // Final branding fallback
   return (
     <div className="w-full h-full bg-slate-50 flex items-center justify-center text-center p-1 border border-slate-100 rounded">
       <span className="text-[9px] font-black text-slate-300 uppercase leading-tight">

@@ -120,9 +120,20 @@ function parseRingPowerPage(textLines: {y: number, text: string}[]): { items: Qu
       };
       currentY = lineObj.y;
     } else if (currentItem) {
-      if (Math.abs(currentY - lineObj.y) > 300) { items.push(currentItem); yCoords.push(currentY); currentItem = null; continue; }
-      currentItem.desc += " " + cleanDescription(text);
+      // Tighter multi-line tracking (approx 80 points)
+      if (Math.abs(currentY - lineObj.y) > 85) { 
+        items.push(currentItem); 
+        yCoords.push(currentY); 
+        currentItem = null; 
+        continue; 
+      }
+      
+      const cleanedPart = cleanDescription(text);
+      if (cleanedPart) {
+        currentItem.desc += " " + cleanedPart;
+      }
       if (currentItem.weight === 0) currentItem.weight = extractWeight(text);
+      if (!currentItem.availability) currentItem.availability = extractAvailability(text).availability;
     }
   }
   if (currentItem) { items.push(currentItem); yCoords.push(currentY); }
@@ -132,6 +143,7 @@ function parseRingPowerPage(textLines: {y: number, text: string}[]): { items: Qu
 function parseCostexPage(textLines: {y: number, text: string}[]): { items: QuoteItem[], yCoords: number[] } {
   const items: QuoteItem[] = [];
   const yCoords: number[] = [];
+  // 0003 4484218 KIT-BEARING (0.25 1.71 In Stock 01 6 6 318.41 50.28 301.68
   const itemRegex = /^\s*(\d{4})\s+(\S+)\s+(.+?)\s+(\d+\.\d+)\s+(.*?)\s+(\d+)\s+(\d+)\s+([\d,\.]+)\s+([\d,\.]+)\s+([\d,\.]+)$/i;
 
   for (const lineObj of textLines) {
@@ -209,62 +221,73 @@ export const parsePdfFile = async (file: File): Promise<QuoteItem[]> => {
     const isCostex = pageText.includes("COSTEX") || pageText.includes("CTP");
     const { items: pageItems, yCoords } = isCostex ? parseCostexPage(textLines) : parseRingPowerPage(textLines);
 
-    // Image extraction
-    const opList = await page.getOperatorList();
+    // High-fidelity image extraction
     const images: { y: number, dataUrl: string }[] = [];
-    
-    for (let j = 0; j < opList.fnArray.length; j++) {
-      if (opList.fnArray[j] === window.pdfjsLib.OPS.paintImageXObject) {
-        const imgKey = opList.argsArray[j][0];
-        const currentTransform = opList.argsArray[j-1];
-        if (currentTransform && currentTransform.length === 6) {
-          try {
-            const imgData = await page.objs.get(imgKey);
-            if (imgData && imgData.data) {
-              const canvas = document.createElement("canvas");
-              canvas.width = imgData.width;
-              canvas.height = imgData.height;
-              const ctx = canvas.getContext("2d");
-              if (ctx) {
-                const imageData = ctx.createImageData(imgData.width, imgData.height);
-                const data = imgData.data;
-                const pixels = imageData.data;
-                
-                // Handling different PDF pixel formats (RGB vs RGBA vs Gray)
-                if (data.length === imgData.width * imgData.height * 3) {
-                  for (let p = 0, q = 0; p < data.length; p += 3, q += 4) {
-                    pixels[q] = data[p];
-                    pixels[q+1] = data[p+1];
-                    pixels[q+2] = data[p+2];
-                    pixels[q+3] = 255;
-                  }
-                } else if (data.length === imgData.width * imgData.height * 4) {
-                   pixels.set(data);
-                } else if (data.length === imgData.width * imgData.height) {
-                   for (let p = 0, q = 0; p < data.length; p++, q += 4) {
-                    pixels[q] = pixels[q+1] = pixels[q+2] = data[p];
-                    pixels[q+3] = 255;
-                  }
+    const operatorList = await page.getOperatorList();
+    const { fnArray, argsArray } = operatorList;
+
+    const transformStack: any[] = [];
+    let currentTransform = [1, 0, 0, 1, 0, 0];
+
+    for (let i = 0; i < fnArray.length; i++) {
+      const fn = fnArray[i];
+      const args = argsArray[i];
+
+      if (fn === window.pdfjsLib.OPS.save) {
+        transformStack.push(currentTransform);
+      } else if (fn === window.pdfjsLib.OPS.restore) {
+        currentTransform = transformStack.pop() || [1, 0, 0, 1, 0, 0];
+      } else if (fn === window.pdfjsLib.OPS.transform) {
+        currentTransform = window.pdfjsLib.Util.transform(currentTransform, args);
+      } else if (fn === window.pdfjsLib.OPS.paintImageXObject) {
+        const imgKey = args[0];
+        try {
+          const imgData = await page.objs.get(imgKey);
+          if (imgData && imgData.data) {
+            const canvas = document.createElement("canvas");
+            canvas.width = imgData.width;
+            canvas.height = imgData.height;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              const imageData = ctx.createImageData(imgData.width, imgData.height);
+              const data = imgData.data;
+              const pixels = imageData.data;
+              
+              if (data.length === imgData.width * imgData.height * 3) {
+                for (let p = 0, q = 0; p < data.length; p += 3, q += 4) {
+                  pixels[q] = data[p];
+                  pixels[q+1] = data[p+1];
+                  pixels[q+2] = data[p+2];
+                  pixels[q+3] = 255;
                 }
-                
-                ctx.putImageData(imageData, 0, 0);
-                const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-                images.push({ y: currentTransform[5], dataUrl });
+              } else if (data.length === imgData.width * imgData.height * 4) {
+                 pixels.set(data);
+              } else if (data.length === imgData.width * imgData.height) {
+                 for (let p = 0, q = 0; p < data.length; p++, q += 4) {
+                  pixels[q] = pixels[q+1] = pixels[q+2] = data[p];
+                  pixels[q+3] = 255;
+                }
               }
+              
+              ctx.putImageData(imageData, 0, 0);
+              images.push({ 
+                y: currentTransform[5], 
+                dataUrl: canvas.toDataURL("image/jpeg", 0.9) 
+              });
             }
-          } catch (e) {}
-        }
+          }
+        } catch (e) {}
       }
     }
 
-    // Association logic based on vertical alignment
+    // Associate images with items
     pageItems.forEach((item, idx) => {
       const itemY = yCoords[idx];
       let bestImg = null;
       let minDiff = Infinity;
       images.forEach(img => {
         const diff = Math.abs(img.y - itemY);
-        if (diff < minDiff && diff < 100) { 
+        if (diff < minDiff && diff < 80) { 
           minDiff = diff; 
           bestImg = img.dataUrl; 
         }
