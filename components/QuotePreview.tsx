@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { QuoteItem, ClientInfo, AppConfig } from '../types.ts';
+import { QuoteItem, ClientInfo, AppConfig, AdminInfo } from '../types.ts';
 import { PartImage } from './PartImage.tsx';
 import { Logo } from './Logo.tsx';
 
@@ -8,7 +9,7 @@ interface QuotePreviewProps {
   client: ClientInfo;
   config: AppConfig;
   aiAnalysis: string | null;
-  customLogo: string | null;
+  adminInfo: AdminInfo;
 }
 
 const SummaryLine: React.FC<{ label: string; value: string; isTotal?: boolean }> = ({ label, value, isTotal = false }) => (
@@ -19,7 +20,59 @@ const SummaryLine: React.FC<{ label: string; value: string; isTotal?: boolean }>
   </div>
 );
 
-export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, config, aiAnalysis, customLogo }) => {
+const AddressBlock: React.FC<{ title: string; client: ClientInfo; config?: AppConfig; isShipping?: boolean }> = ({ title, client, config, isShipping = false }) => {
+  let name = client.company;
+  let contact = client.contactName;
+  let address = client.address;
+  let city = client.city;
+  let state = client.state;
+  let zip = client.zip;
+  let country = client.country;
+  let email = client.email;
+  let phone = client.phone;
+
+  if (isShipping && config && (config.shippingCompany || config.shippingAddress)) {
+      name = config.shippingCompany || client.company;
+      contact = client.contactName; // Assuming contact person is the same
+      address = config.shippingAddress || client.address;
+      city = config.shippingCity || client.city;
+      state = config.shippingState || client.state;
+      zip = config.shippingZip || client.zip;
+      country = config.shippingCountry || client.country;
+      phone = config.shippingPhone || client.phone;
+      email = client.email;
+  }
+
+  return (
+    <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-200 text-xs">
+      <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-4">{title}</h3>
+      <p className="font-bold text-slate-800 text-sm">{name}</p>
+      <p className="text-slate-600 font-medium">{contact}</p>
+      <address className="text-slate-600 mt-2 not-italic">
+          {address}<br />
+          {city}, {state} {zip}<br />
+          {country}
+      </address>
+      <div className="mt-4 border-t border-slate-200 pt-3 space-y-2">
+          {email && (
+            <p className="text-slate-600 flex items-center gap-2.5">
+              <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+              <span>{email}</span>
+            </p>
+          )}
+          {phone && (
+            <p className="text-slate-600 flex items-center gap-2.5">
+              <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+              <span>{phone}</span>
+            </p>
+          )}
+      </div>
+    </div>
+  );
+};
+
+
+export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, config, aiAnalysis, adminInfo }) => {
   if (items.length === 0) return null;
 
   const markupMultiplier = 1 + (config.markupPercentage / 100);
@@ -40,15 +93,20 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
     <div className="max-w-[1000px] mx-auto bg-white p-12 min-h-screen text-[#333] font-sans print:p-8 print:w-full print:max-w-none font-[Helvetica] relative flex flex-col">
       
       {/* Header Branding */}
-      <header className="flex justify-between items-start mb-8">
-        <div className="flex items-center gap-4">
-          {customLogo ? 
-            <img src={customLogo} alt="Official Hub Logo" className="h-12 w-auto object-contain" /> :
-            <div className="w-16 h-16 bg-black flex items-center justify-center p-1 rounded-md">
-               <Logo className="h-12" />
+      <header className="flex justify-between items-start mb-10">
+        <div className="flex items-center gap-6">
+          {adminInfo.logoUrl ? 
+            <img src={adminInfo.logoUrl} alt="Company Logo" className="h-20 w-auto object-contain" /> :
+            <div className="w-20 h-20 bg-black flex items-center justify-center p-2 rounded-xl">
+               <Logo className="h-16" />
             </div>
           }
-          <h1 className="text-2xl font-extrabold tracking-wider text-black">AMERICAN IRON LLC BILLING HUB</h1>
+          <div>
+            <h1 className="text-4xl font-black tracking-[0.2em] text-black uppercase">{adminInfo.companyName}</h1>
+            <p className="text-xs text-slate-500 font-mono mt-2">
+                {adminInfo.address}, {adminInfo.city}, {adminInfo.state} {adminInfo.zip} | {adminInfo.phone} | {adminInfo.email}
+            </p>
+          </div>
         </div>
         <div className="text-right">
           <h2 className="text-3xl font-extrabold tracking-tighter">{config.isInvoice ? 'INVOICE' : 'QUOTATION'}</h2>
@@ -58,40 +116,17 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
 
       {/* Profile Grids */}
       <section className="grid grid-cols-2 gap-8 text-xs mb-8">
-        <div className="border border-slate-200 p-4 rounded-md shadow-sm">
-          <h3 className="font-bold text-sm mb-2 border-b border-slate-100 pb-1 uppercase tracking-widest text-slate-500">Origin Account</h3>
-          <div className="grid grid-cols-[120px_1fr] gap-1">
-            <span className="font-semibold text-gray-600">Account #:</span><span>{client.accountNumber ? `${client.accountNumber} - ${client.company}` : client.company}</span>
-            <span className="font-semibold text-gray-600">Issue Date:</span><span>{new Date().toLocaleDateString()}</span>
-            <span className="font-semibold text-gray-600">Official Agent:</span>
-            <div className="flex flex-col">
-              <span>{client.contactName}</span>
-              <span>{client.email}</span>
-              <span>{client.phone}</span>
-            </div>
-          </div>
-        </div>
-        <div className="border border-slate-200 p-4 rounded-md shadow-sm">
-          <h3 className="font-bold text-sm mb-2 border-b border-slate-100 pb-1 uppercase tracking-widest text-slate-500">Billing Profile</h3>
-          <div className="grid grid-cols-[120px_1fr] gap-1">
-            <span className="font-semibold text-gray-600">Settlement Method:</span><span>{config.paymentTerms || 'Net 30'}</span>
-            <span className="font-semibold text-gray-600">Registered Address:</span>
-            <div className="flex flex-col">
-              <span>{client.address}</span>
-              <span>{client.city}, {client.state} {client.zip}</span>
-              <span>{client.country}</span>
-            </div>
-          </div>
-        </div>
+        <AddressBlock title="Bill To" client={client} />
+        <AddressBlock title="Ship To" client={client} config={config} isShipping={true} />
       </section>
 
       <section className="border border-slate-200 p-4 rounded-md text-xs mb-8 shadow-sm">
-         <h3 className="font-bold text-sm mb-2 border-b border-slate-100 pb-1 uppercase tracking-widest text-slate-500">Logistics Parameters</h3>
+         <h3 className="font-bold text-sm mb-2 border-b border-slate-100 pb-1 uppercase tracking-widest text-slate-500">Logistics & Terms</h3>
          <div className="grid grid-cols-[200px_1fr] gap-2">
-            <span className="font-semibold text-gray-600">Est. Arrival/Pickup Target:</span><span>{config.expirationDate}</span>
-            <span className="font-semibold text-gray-600">Release Node:</span><span>American Iron Distribution Center</span>
-            <span className="font-semibold text-gray-600">Destination Final Site:</span>
-            <span className="whitespace-pre-line">{showShippingAddress(config, client)}</span>
+            <span className="font-semibold text-gray-600">Issue Date:</span><span>{new Date().toLocaleDateString()}</span>
+            <span className="font-semibold text-gray-600">Valid Until:</span><span>{config.expirationDate}</span>
+            <span className="font-semibold text-gray-600">Payment Terms:</span><span>{config.paymentTerms || 'Net 30'}</span>
+            <span className="font-semibold text-gray-600">PO Number:</span><span>{config.poNumber || 'N/A'}</span>
          </div>
       </section>
 
@@ -187,6 +222,11 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
                  <span className="w-1.5 h-1.5 bg-slate-200 rounded-full"></span>
                  <span>IRON VERIFIED</span>
              </div>
+             <div className="mt-6 pt-6 border-t border-slate-100">
+                 <p className="text-[9px] font-bold text-slate-500 font-mono">
+                     {adminInfo.companyName} | {adminInfo.address}, {adminInfo.city}, {adminInfo.state} {adminInfo.zip} | {adminInfo.phone}
+                 </p>
+             </div>
              <div className="page-number-container hidden print:block">
                 {/* Managed by global CSS counter */}
              </div>
@@ -195,10 +235,3 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
     </div>
   );
 };
-
-const showShippingAddress = (config: AppConfig, client: ClientInfo) => {
-    if (config.shippingCompany || config.shippingAddress) {
-        return `${config.shippingCompany || ''}\n${config.shippingAddress || ''}\n${config.shippingCity || ''}, ${config.shippingState || ''} ${config.shippingZip || ''}\n${config.shippingCountry || ''}`;
-    }
-    return `${client.address}\n${client.city}, ${client.state} ${client.zip}\n${client.country}`;
-}
