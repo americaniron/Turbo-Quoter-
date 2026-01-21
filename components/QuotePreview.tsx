@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { QuoteItem, ClientInfo, AppConfig, AdminInfo } from '../types.ts';
 import { PartImage } from './PartImage.tsx';
@@ -161,7 +162,7 @@ export const QuotePreview: React.FC<QuotePreviewProps> = ({ items, client, confi
                         )}
                         <div className="flex flex-col justify-center">
                            <div className="font-black text-slate-900 text-sm tracking-tight">{item.partNo}</div>
-                           <div className="text-slate-600 mt-1 leading-relaxed max-w-[300px]">{item.desc}</div>
+                           <div className="text-slate-600 mt-1 leading-relaxed">{item.desc}</div>
                            <div className="text-slate-400 text-[10px] mt-1 font-bold">CALCULATED MASS: {item.weight.toFixed(2)} lbs</div>
                         </div>
                      </td>
