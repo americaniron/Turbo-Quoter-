@@ -1,15 +1,18 @@
 
-
 import React, { useState } from 'react';
-import { User, UserCredentials } from '../types.ts';
+import { User } from '../types.ts';
 import { Logo } from './Logo.tsx';
 
 interface LoginProps {
-  onLogin: (user: UserCredentials) => void;
-  users: UserCredentials[];
+  onLogin: (user: User) => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
+const USERS = [
+  { username: 'ironman1111', password: 'YaKareem1121@', displayName: 'Iron Command', role: 'Chief Engineer' },
+  { username: 'batbout', password: 'batto123', displayName: 'Logistics Hub', role: 'Logistics Specialist' }
+];
+
+export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,14 +24,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
     setLoading(true);
 
     setTimeout(() => {
-      // SECURITY NOTE: This is a simulated login for demonstration purposes.
-      // In a production environment, the password would be sent to a secure backend 
-      // endpoint for validation against a hashed value in a database.
-      // We are only checking for the username's existence here.
-      const found = users.find(u => u.username === username);
-
+      const found = USERS.find(u => u.username === username && u.password === password);
       if (found) {
-        onLogin(found);
+        onLogin({
+          username: found.username,
+          displayName: found.displayName,
+          role: found.role
+        });
       } else {
         setError('ACCESS DENIED: INVALID CREDENTIALS');
         setLoading(false);
@@ -48,7 +50,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
           <div className="bg-slate-900/80 p-8 rounded-[3rem] border-2 border-slate-800 shadow-2xl mb-6">
             <Logo className="h-32 w-auto object-contain" />
           </div>
-          <h1 className="text-3xl font-black text-white uppercase tracking-[0.2em] italic">IRON BILLING</h1>
+          <h1 className="text-3xl font-black text-white uppercase tracking-[0.2em] italic">Engineering Portal</h1>
           <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.5em] mt-2 text-center">American Iron Logistics & Supply Hub</p>
         </div>
 

@@ -1,6 +1,5 @@
 
 
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuoteItem, ClientInfo, AppConfig, EmailDraft } from "../types.ts";
 
@@ -106,71 +105,46 @@ export const generateEmailDraft = async (
 };
 
 /**
- * Generates an exact part photo using Gemini 3 Pro Image with a retry mechanism for transient errors.
+ * Generates an exact part photo using Gemini 3 Pro Image (Nano Banana Pro).
  */
 export const generatePartImage = async (partNo: string, description: string, size: '1K' | '2K' | '4K' = '1K'): Promise<string | null> => {
   const cleanDesc = description.replace(/CAT COMPONENT|CAT PART|ASSEMBLY/gi, '').trim();
   const prompt = `Highly detailed industrial product catalog photograph of Caterpillar heavy machinery part ${partNo}. ${cleanDesc}. Isolated on pure white background, studio lighting, professional 8k resolution.`;
 
-  const MAX_RETRIES = 3;
-  const INITIAL_DELAY_MS = 1000;
-
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      // API Key Selection check mandatory for gemini-3-pro-image-preview
-      if (typeof window !== 'undefined' && window.aistudio) {
-          if (!(await window.aistudio.hasSelectedApiKey())) {
-              await window.aistudio.openSelectKey();
-          }
-      }
-
-      // Create a new GoogleGenAI instance right before making an API call
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-image-preview',
-        contents: { parts: [{ text: prompt }] },
-        config: { 
-          imageConfig: { 
-            aspectRatio: "1:1", 
-            imageSize: size 
-          } 
+  try {
+    // API Key Selection check mandatory for gemini-3-pro-image-preview
+    if (typeof window !== 'undefined' && window.aistudio) {
+        if (!(await window.aistudio.hasSelectedApiKey())) {
+            await window.aistudio.openSelectKey();
         }
-      });
-      
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          // Success! Return the image data.
-          return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        }
+    }
+
+    // Create a new GoogleGenAI instance right before making an API call
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-pro-image-preview',
+      contents: { parts: [{ text: prompt }] },
+      config: { 
+        imageConfig: { 
+          aspectRatio: "1:1", 
+          imageSize: size 
+        } 
       }
-      // If no image part is found, but the request succeeded, don't retry.
-      return null; 
-
-    } catch (error: any) {
-      console.error(`Image generation hub error (Attempt ${attempt + 1}/${MAX_RETRIES}):`, error);
-
-      // Check for a retryable error (e.g., 503 overload)
-      const isRetryable = error.message?.includes("503") || error.message?.includes("UNAVAILABLE") || error.message?.includes("overloaded");
-
-      if (isRetryable && attempt < MAX_RETRIES - 1) {
-        const delay = INITIAL_DELAY_MS * Math.pow(2, attempt) + Math.random() * 1000;
-        console.warn(`Model is overloaded. Retrying in ${Math.round(delay / 1000)}s...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue; // Go to the next attempt
+    });
+    
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
       }
-
-      // Handle the separate, non-retryable API key error
-      if (error.message?.includes("Requested entity was not found.") && typeof window !== 'undefined' && window.aistudio) {
-          await window.aistudio.openSelectKey();
-      }
-      
-      // If it's the last attempt or not a retryable error, break the loop.
-      break;
+    }
+  } catch (error: any) {
+    console.error("Image generation hub error:", error);
+    // Reset key selection if requested entity not found
+    if (error.message?.includes("Requested entity was not found.") && typeof window !== 'undefined' && window.aistudio) {
+        await window.aistudio.openSelectKey();
     }
   }
-
-  // If all retries fail, return null.
   return null;
 };
 

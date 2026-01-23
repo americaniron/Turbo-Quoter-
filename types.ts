@@ -1,14 +1,8 @@
 
 
+
 export interface User {
   username: string;
-  role: string;
-  displayName: string;
-}
-
-export interface UserCredentials {
-  username: string;
-  password?: string;
   role: string;
   displayName: string;
 }
@@ -83,45 +77,18 @@ export enum ParseMode {
   EXCEL = 'excel'
 }
 
-export interface AdminInfo {
-  companyName: string;
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
-  country: string;
-  phone: string;
-  email: string;
-  website: string;
-  logoUrl: string | null;
-}
-
-export enum Theme {
-  LIGHT = 'light',
-  DARK = 'dark',
-}
-
-export interface AppSettings {
-  adminInfo: AdminInfo;
-  theme: Theme;
-  users: UserCredentials[];
-}
-
-
-// Define global types and augment the Window interface to fix type collision errors.
-// Moving the AIStudio interface into declare global ensures it merges correctly with
-// existing global definitions and satisfies the requirements of the execution environment.
+// FIX: Define AIStudio and augment the Window interface within `declare global`
+// to prevent module scope conflicts that can cause "Subsequent property declarations must have the same type" errors.
 declare global {
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
   }
-
+  
   interface Window {
     pdfjsLib: any;
     pdfjsLibUrl?: string;
     XLSX: any;
-    // Fix: Reference the global AIStudio type and mark as optional to avoid subsequent property declaration conflicts.
     aistudio?: AIStudio;
   }
 }

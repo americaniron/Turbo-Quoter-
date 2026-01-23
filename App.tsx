@@ -4,10 +4,7 @@ import { ConfigPanel } from './components/ConfigPanel.tsx';
 import { QuotePreview } from './components/QuotePreview.tsx';
 import { EmailModule } from './components/EmailModule.tsx';
 import { Login } from './components/Login.tsx';
-import { PrintControls } from './components/PrintControls.tsx';
-import { SettingsPanel } from './components/SettingsPanel.tsx';
-import { ReviewModal } from './components/ReviewModal.tsx';
-import { QuoteItem, ClientInfo, AppConfig, SavedClient, User, PhotoMode, AppSettings, Theme, AdminInfo, UserCredentials } from './types.ts';
+import { QuoteItem, ClientInfo, AppConfig, SavedClient, User, PhotoMode } from './types.ts';
 import { analyzeQuoteData } from './services/geminiService.ts';
 
 const generateDocumentId = (isInvoice: boolean) => {
@@ -17,40 +14,10 @@ const generateDocumentId = (isInvoice: boolean) => {
   return `${prefix}-${dateStr}-${randomHex}`;
 };
 
-const DEFAULT_ADDRESS_BOOK: SavedClient[] = [
-  { id: '1', company: 'Global Construction Co.', contactName: 'John Doe', email: 'j.doe@global-construction.com', phone: '123-456-7890', address: '123 Main St', city: 'Metropolis', state: 'NY', zip: '10001', country: 'United States', accountNumber: 'GCC-001' },
-  { id: '2', company: 'Mega Miners Inc.', contactName: 'Jane Smith', email: 'j.smith@megaminers.com', phone: '987-654-3210', address: '456 Mining Rd', city: 'Bedrock', state: 'CA', zip: '90210', country: 'United States', accountNumber: 'MMI-002' }
-];
-
-const DEFAULT_SETTINGS: AppSettings = {
-  adminInfo: {
-    companyName: 'AMERICAN IRON LLC',
-    address: '123 Machinery Lane',
-    city: 'Tampa',
-    state: 'FL',
-    zip: '33602',
-    country: 'United States',
-    phone: '1-800-555-IRON',
-    email: 'sales@americaniron.com',
-    website: 'americaniron1.com',
-    logoUrl: null,
-  },
-  theme: Theme.LIGHT,
-  users: [
-    { username: 'ironman1111', displayName: 'Iron Command', role: 'Chief Engineer' },
-    { username: 'batbout', displayName: 'Logistics Hub', role: 'Logistics Specialist' }
-  ]
-};
-
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(() => {
     const saved = sessionStorage.getItem('ai_current_user');
     return saved ? JSON.parse(saved) : null;
-  });
-
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const savedSettings = localStorage.getItem('american_iron_settings');
-    return savedSettings ? JSON.parse(savedSettings) : DEFAULT_SETTINGS;
   });
 
   const getDefaultExpiration = () => {
@@ -67,13 +34,12 @@ const App: React.FC = () => {
     const savedBook = localStorage.getItem(GLOBAL_BOOK_KEY);
     if (savedBook) {
       try {
-        const parsed = JSON.parse(savedBook);
-        return parsed.length > 0 ? parsed : DEFAULT_ADDRESS_BOOK;
+        return JSON.parse(savedBook);
       } catch (e) {
-        return DEFAULT_ADDRESS_BOOK;
+        return [];
       }
     }
-    return DEFAULT_ADDRESS_BOOK;
+    return [];
   });
 
   const [client, setClient] = useState<ClientInfo>({ 
@@ -100,7 +66,7 @@ const App: React.FC = () => {
     weightUnit: 'LBS',
     includeAiAnalysis: false,
     photoMode: PhotoMode.EXTRACT, 
-    imageSize: '1K',
+    imageSize: '1K', // Requirement 2: Size selection default
     paymentTerms: 'Net 30',
     shippingCompany: '',
     shippingPhone: '',
@@ -113,45 +79,20 @@ const App: React.FC = () => {
   
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [customLogo, setCustomLogo] = useState<string | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
   const [isEmailOpen, setIsEmailOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [parsedItemsForReview, setParsedItemsForReview] = useState<QuoteItem[] | null>(null);
   
   const resultRef = useRef<HTMLDivElement>(null);
 
   const getStorageKey = (base: string) => user ? `${base}_${user.username}` : base;
 
   useEffect(() => {
-    localStorage.setItem('american_iron_settings', JSON.stringify(settings));
-    
-    // Handle theme changes
-    const root = document.documentElement;
-    if (settings.theme === Theme.DARK) {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [settings]);
-
-  useEffect(() => {
-    const originalTitle = document.title;
-    const handleBeforePrint = () => { 
-      document.title = `${config.isInvoice ? 'INVOICE' : 'QUOTE'}-${config.quoteId}-${client.company || 'Client'}`;
-    };
-    const handleAfterPrint = () => {
-      document.title = originalTitle;
-    };
-
+    document.title = "AMERICAN IRON LLC BILLING HUB";
+    const handleBeforePrint = () => { document.title = "AMERICAN IRON LLC BILLING HUB"; };
     window.addEventListener('beforeprint', handleBeforePrint);
-    window.addEventListener('afterprint', handleAfterPrint);
-
-    return () => {
-      window.removeEventListener('beforeprint', handleBeforePrint);
-      window.removeEventListener('afterprint', handleAfterPrint);
-      document.title = originalTitle;
-    };
-  }, [config.isInvoice, config.quoteId, client.company]);
+    return () => window.removeEventListener('beforeprint', handleBeforePrint);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -163,17 +104,9 @@ const App: React.FC = () => {
     localStorage.setItem(GLOBAL_BOOK_KEY, JSON.stringify(addressBook));
   }, [addressBook]);
 
-  const handleLogin = (u: UserCredentials) => {
-    sessionStorage.setItem('ai_current_user', JSON.stringify({
-      username: u.username,
-      displayName: u.displayName,
-      role: u.role
-    }));
-    setUser({
-      username: u.username,
-      displayName: u.displayName,
-      role: u.role
-    });
+  const handleLogin = (u: User) => {
+    sessionStorage.setItem('ai_current_user', JSON.stringify(u));
+    setUser(u);
   };
 
   const handleLogout = () => {
@@ -190,19 +123,6 @@ const App: React.FC = () => {
     }, 100);
   };
 
-  const handleParseComplete = (parsedItems: QuoteItem[]) => {
-    setParsedItemsForReview(parsedItems);
-  };
-
-  const handleReviewConfirm = (finalItems: QuoteItem[]) => {
-    handleDataLoaded(finalItems);
-    setParsedItemsForReview(null);
-  };
-  
-  const handleReviewCancel = () => {
-    setParsedItemsForReview(null);
-  };
-
   const handleAnalyze = async () => {
     if (items.length === 0) return;
     setIsAnalyzing(true);
@@ -217,10 +137,6 @@ const App: React.FC = () => {
   };
 
   const handleSaveToBook = (newClient: ClientInfo) => {
-    if (!newClient.company) {
-      alert("Company name is required to save to the address book.");
-      return;
-    }
     const isDuplicate = addressBook.some(c => 
       c.company.trim().toLowerCase() === newClient.company.trim().toLowerCase()
     );
@@ -232,7 +148,6 @@ const App: React.FC = () => {
 
     const id = Date.now().toString();
     setAddressBook(prev => [...prev, { ...newClient, id }]);
-    alert(`"${newClient.company}" has been added to the directory.`);
   };
 
   const handleDeleteFromBook = (id: string) => {
@@ -246,7 +161,7 @@ const App: React.FC = () => {
     }
 
     try {
-        const data = { version: '2.0', author: user?.username, timestamp: new Date().toISOString(), items, client, config, aiAnalysis, settings: { adminInfo: settings.adminInfo } };
+        const data = { version: '1.9', author: user?.username, timestamp: new Date().toISOString(), items, client, config, customLogo, aiAnalysis };
         const json = JSON.stringify(data, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -281,9 +196,7 @@ const App: React.FC = () => {
         if (json.items) setItems(json.items);
         if (json.client) setClient(prev => ({ ...prev, ...json.client }));
         if (json.config) setConfig(prev => ({ ...prev, ...json.config }));
-        if (json.settings && json.settings.adminInfo) {
-          setSettings(prev => ({...prev, adminInfo: json.settings.adminInfo}));
-        }
+        setCustomLogo(json.customLogo || null);
         setAiAnalysis(json.aiAnalysis || null);
         setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       } catch (err) {
@@ -327,20 +240,15 @@ const App: React.FC = () => {
     setConfig(prev => ({ ...prev, quoteId: generateDocumentId(prev.isInvoice) }));
   }, []);
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   if (!user) {
-    return <Login onLogin={handleLogin} users={settings.users} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   return (
-    <div className="min-h-screen pb-20 print:min-h-0 print:pb-0 print:bg-white fade-in bg-slate-50 dark:bg-slate-900 transition-colors">
+    <div className="min-h-screen pb-20 print:min-h-0 print:pb-0 print:bg-white fade-in">
       <ConfigPanel 
-        onOpenSettings={() => setIsSettingsOpen(true)}
         itemsCount={items.length}
-        onParseComplete={handleParseComplete}
+        onDataLoaded={handleDataLoaded}
         onConfigChange={setConfig}
         onClientChange={setClient}
         onAnalyze={handleAnalyze}
@@ -353,6 +261,8 @@ const App: React.FC = () => {
         isAnalyzing={isAnalyzing}
         config={config}
         client={client}
+        customLogo={customLogo}
+        onLogoUpload={setCustomLogo}
         onRefreshId={handleRefreshId}
         addressBook={addressBook}
         onSaveToBook={handleSaveToBook}
@@ -361,19 +271,14 @@ const App: React.FC = () => {
         onLogout={handleLogout}
       />
       
-      <div ref={resultRef}>
-        {items.length > 0 && (
-          <PrintControls onPrint={handlePrint} />
-        )}
-        <div className="quote-preview-container">
-          <QuotePreview 
-              items={items} 
-              client={client} 
-              config={config} 
-              aiAnalysis={aiAnalysis}
-              adminInfo={settings.adminInfo}
-          />
-        </div>
+      <div ref={resultRef} className="quote-preview-container">
+        <QuotePreview 
+            items={items} 
+            client={client} 
+            config={config} 
+            aiAnalysis={aiAnalysis}
+            customLogo={customLogo}
+        />
       </div>
 
       <EmailModule 
@@ -383,22 +288,6 @@ const App: React.FC = () => {
         config={config} 
         items={items} 
       />
-      
-      {isSettingsOpen && (
-        <SettingsPanel 
-          settings={settings}
-          onSettingsChange={setSettings}
-          onClose={() => setIsSettingsOpen(false)}
-        />
-      )}
-      
-      {parsedItemsForReview && (
-        <ReviewModal
-          items={parsedItemsForReview}
-          onConfirm={handleReviewConfirm}
-          onCancel={handleReviewCancel}
-        />
-      )}
     </div>
   );
 };
